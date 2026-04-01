@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sysarcsim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="desk"></canvas>
+    <aside id="sidebar">
+      <div class="sidebar-title" id="level-title"></div>
+
+      <div id="sidebar-cards"></div>
+
+      <div class="sidebar-hint">
+        Click or drag to place elements.<br>
+        Drag from <span class="hint-out">output</span> to <span class="hint-in">input</span> to connect.<br>
+        Right-click or select to remove.
+      </div>
+    </aside>
+  </div>
+
+  <div id="controls">
+    <span id="status">Connect elements to satisfy the demand.</span>
+    <span id="win-badge" hidden>Level Complete</span>
+    <button id="btn-next-level" hidden>Next Level →</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: monospace;
+  background: #0d1117;
+  color: #e6edf3;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+#desk {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+#sidebar {
+  width: 200px;
+  background: #161b22;
+  border-left: 1px solid #30363d;
+  padding: 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #8b949e;
+  padding-bottom: 2px;
+}
+
+.card {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.card:hover {
+  background: #2d333b;
+  border-color: #58a6ff;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card--active {
+  border-color: #58a6ff;
+  background: #2d333b;
+  box-shadow: 0 0 0 2px #1f6feb55;
+  cursor: cell;
+}
+
+.card-name {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.card-io {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.card-io span {
+  font-size: 10px;
+  color: #8b949e;
+}
+
+.card-io .out { color: #79c0ff; }
+.card-io .in  { color: #56d364; }
+
+.sidebar-hint {
+  margin-top: auto;
+  font-size: 10px;
+  color: #484f58;
+  line-height: 1.6;
+}
+
+.hint-out { color: #79c0ff; }
+.hint-in  { color: #56d364; }
+
+#controls {
+  height: 44px;
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#status {
+  flex: 1;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+#btn-next-level {
+  background: #1f6feb;
+  color: #ffffff;
+  border: 1px solid #388bfd;
+  border-radius: 6px;
+  padding: 5px 16px;
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#btn-next-level:hover { background: #388bfd; }
+#btn-next-level[hidden] { display: none; }
+
+#btn-reset {
+  background: #21262d;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 5px 16px;
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+#btn-reset:hover { background: #30363d; }
+
+/* Win badge */
+#win-badge {
+  font-size: 12px;
+  font-weight: bold;
+  color: #56d364;
+  border: 1px solid #238636;
+  border-radius: 4px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+#win-badge[hidden] { display: none; }

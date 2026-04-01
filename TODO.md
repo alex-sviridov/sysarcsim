@@ -1,0 +1,3 @@
+- animation on type mismatch (create red cconnection, blink, remove it)
+- animation for an active connection moving data from input to output. Small "packets" (glowing dots) moving along the connection lines.
+- zoom in/out with mouse and buttons, movable board with center button
