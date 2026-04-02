@@ -201,7 +201,7 @@ export class Game {
   // ── Render loop ───────────────────────────────────────────────────────────
 
   #loop() {
-    this.#renderer.render(this);
+    this.#renderer.render(this, performance.now());
     requestAnimationFrame(this.#boundLoop);
   }
 }

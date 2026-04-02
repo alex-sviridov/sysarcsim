@@ -139,7 +139,8 @@ export class ConnectionManager {
 
     // --- Step 2: Forward pass ---
     const activePct = new Map(); // GameElement → 0–100
-    const flow      = new Map(); // `${elemId}:${portIdx}` → current output flow
+    const flow      = new Map(); // `${elemId}:${portIdx}` → total output flow (for display)
+    const connRatio = new Map(); // connId → 0..1 share of source port capacity
     const received  = new Map(); // `${elemId}:${portIdx}` → received at input
 
     const connsByPort = new Map(); // `${fromId}:${fromPort}` → Connection[]
@@ -168,8 +169,9 @@ export class ConnectionManager {
       const outK = outputKeys(el.def);
       const pct  = activePct.get(el);
       for (let j = 0; j < outK.length; j++) {
-        const spec         = el.def.outputs[outK[j]];
-        let pool           = spec.supply * pct / 100;
+        const spec     = el.def.outputs[outK[j]];
+        const capacity     = spec.supply * pct / 100;
+        let pool           = capacity;
         let totalAllocated = 0;
 
         for (const c of connsByPort.get(`${el.id}:${j}`) ?? []) {
@@ -180,7 +182,8 @@ export class ConnectionManager {
           const stillNeeds = toSpec ? Math.max(0, toSpec.demand - alreadyGot) : 0;
           const give       = Math.min(pool, stillNeeds);
           received.set(`${c.toId}:${c.toPort}`, (received.get(`${c.toId}:${c.toPort}`) ?? 0) + give);
-          pool          -= give;
+          connRatio.set(c.id, capacity > 0 ? give / capacity : 0);
+          pool           -= give;
           totalAllocated += give;
         }
 
@@ -188,6 +191,6 @@ export class ConnectionManager {
       }
     }
 
-    return { activePct, flow, received };
+    return { activePct, flow, connRatio, received };
   }
 }

@@ -78,6 +78,7 @@ function makeMockGame({
   selectedConn = null,
   elements    = [],
   elemMap     = new Map(),
+  computeActivePct = null,
 } = {}) {
   return {
     input: {
@@ -86,10 +87,11 @@ function makeMockGame({
     connMgr: {
       connections,
       selectedConn,
-      computeActivePct: jest.fn(() => ({
+      computeActivePct: computeActivePct ?? jest.fn(() => ({
         activePct: new Map(),
         flow:      new Map(),
         received:  new Map(),
+        connRatio: new Map(),
       })),
       mid: jest.fn(() => ({ x: 50, y: 50 })),
     },
@@ -283,6 +285,81 @@ describe('Renderer drawConnections', () => {
     // Both output and input positions should have been queried
     expect(fromElem.outputPos).toHaveBeenCalledWith(0);
     expect(toElem.inputPos).toHaveBeenCalledWith(0);
+  });
+
+  test('draws packets (arc calls) when connRatio > 0', () => {
+    const canvas = makeCanvas();
+    const r = new Renderer(canvas);
+    r.resize(800, 600, 1);
+
+    const elemMap = new Map();
+    const fromElem = {
+      id: 'from', x: 50, y: 100, w: 200, h: 58,
+      def: { inputs: {}, outputs: { WebSite: { supply: 100 } } },
+      inputPos:  jest.fn(() => ({ x: 50,  y: 143 })),
+      outputPos: jest.fn(() => ({ x: 250, y: 143 })),
+      draw: jest.fn(),
+    };
+    const toElem = {
+      id: 'to', x: 350, y: 100, w: 200, h: 58,
+      def: { inputs: { WebSite: { demand: 100 } }, outputs: {} },
+      inputPos:  jest.fn(() => ({ x: 350, y: 143 })),
+      outputPos: jest.fn(() => ({ x: 550, y: 143 })),
+      draw: jest.fn(),
+    };
+    elemMap.set('from', fromElem);
+    elemMap.set('to',   toElem);
+
+    const conn = { id: 'conn1', fromId: 'from', toId: 'to', fromPort: 0, toPort: 0 };
+    const activePct = new Map([[fromElem, 100], [toElem, 100]]);
+    const connRatio  = new Map([['conn1', 1]]);
+    const game = makeMockGame({
+      connections: [conn],
+      elemMap,
+      computeActivePct: jest.fn(() => ({
+        activePct,
+        flow:      new Map(),
+        received:  new Map(),
+        connRatio,
+      })),
+    });
+    r.render(game);
+
+    // arc() is called for each of the 3 packets (each has outer glow + inner dot = 2 arcs)
+    const arcCalls = allMethodCalls(canvas._ctx).filter(c => c.method === 'arc');
+    expect(arcCalls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('draws no packets when connRatio is 0', () => {
+    const canvas = makeCanvas();
+    const r = new Renderer(canvas);
+    r.resize(800, 600, 1);
+
+    const elemMap = new Map();
+    const fromElem = {
+      id: 'from', x: 50, y: 100, w: 200, h: 58,
+      def: { inputs: {}, outputs: { WebSite: { supply: 100 } } },
+      inputPos:  jest.fn(() => ({ x: 50,  y: 143 })),
+      outputPos: jest.fn(() => ({ x: 250, y: 143 })),
+      draw: jest.fn(),
+    };
+    const toElem = {
+      id: 'to', x: 350, y: 100, w: 200, h: 58,
+      def: { inputs: { WebSite: { demand: 100 } }, outputs: {} },
+      inputPos:  jest.fn(() => ({ x: 350, y: 143 })),
+      outputPos: jest.fn(() => ({ x: 550, y: 143 })),
+      draw: jest.fn(),
+    };
+    elemMap.set('from', fromElem);
+    elemMap.set('to',   toElem);
+
+    const conn = { id: 'conn1', fromId: 'from', toId: 'to', fromPort: 0, toPort: 0 };
+    const game = makeMockGame({ connections: [conn], elemMap });
+    r.render(game);
+
+    // connRatio defaults to 0, so no arc calls for packets
+    const arcCalls = allMethodCalls(canvas._ctx).filter(c => c.method === 'arc');
+    expect(arcCalls.length).toBe(0);
   });
 });
 
