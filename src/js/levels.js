@@ -15,7 +15,7 @@ export const LEVELS = [
         preset:  true,
       },
     ],
-    available: ['WebServer', 'Database', 'Storage'],
+    available: ['WebServer', 'Database', 'Storage', 'DirectAttachStorage'],
   },
   {
     title: 'Level 2 — Web & Mobile',
@@ -23,7 +23,7 @@ export const LEVELS = [
       {
         type:    'WebUser',
         label:   'Web User',
-        inputs:  { WebSite: { demand: 100 } },
+        inputs:  { WebSite: { demand: 100 }, multipath: true   },
         outputs: {},
         color:   '#c93c37',
         preset:  true,
@@ -37,6 +37,6 @@ export const LEVELS = [
         preset:  true,
       },
     ],
-    available: ['WebServer', 'APIGateway', 'Database', 'Storage'],
+    available: ['WebServer', 'APIGateway', 'Database', 'Storage', 'DirectAttachStorage'],
   },
 ];

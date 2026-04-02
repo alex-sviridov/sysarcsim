@@ -1,3 +1,5 @@
 - animation on type mismatch (create red cconnection, blink, remove it)
-- animation for an active connection moving data from input to output. Small "packets" (glowing dots) moving along the connection lines.
+- animation for an active connection moving data from input to output. Small "packets" (glowing dots) moving along the connection lines. do this animation only when connection is used
 - zoom in/out with mouse and buttons, movable board with center button
+- multiadd when shift is pressed
+- when not full production power is possible, limit the largest based on the minimal

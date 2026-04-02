@@ -61,12 +61,32 @@ export class ConnectionManager {
       return;
     }
 
-    // Replace existing connection to this input slot
-    const displaced = this.connections.find(c => c.toId === toElem.id && c.toPort === toPort);
-    if (displaced && this.selectedConn === displaced) this.selectedConn = null;
-    this.connections = this.connections.filter(
-      c => !(c.toId === toElem.id && c.toPort === toPort)
-    );
+    const outSpec = fromElem.def.outputs[fromType];
+    const inSpec  = toElem.def.inputs[toType];
+
+    // Output multipath:false → displace existing outgoing connection from this port
+    if (outSpec.multipath === false) {
+      const out = this.connections.find(c => c.fromId === fromElem.id && c.fromPort === fromPort);
+      if (out && this.selectedConn === out) this.selectedConn = null;
+      this.connections = this.connections.filter(
+        c => !(c.fromId === fromElem.id && c.fromPort === fromPort)
+      );
+    }
+
+    // Input without multipath:true → displace existing incoming connection to this port
+    if (inSpec.multipath !== true) {
+      const inp = this.connections.find(c => c.toId === toElem.id && c.toPort === toPort);
+      if (inp && this.selectedConn === inp) this.selectedConn = null;
+      this.connections = this.connections.filter(
+        c => !(c.toId === toElem.id && c.toPort === toPort)
+      );
+    }
+
+    // Guard against exact duplicate (same wire redrawn)
+    if (this.connections.some(
+      c => c.fromId === fromElem.id && c.fromPort === fromPort &&
+           c.toId === toElem.id   && c.toPort === toPort
+    )) return;
 
     this.connections.push({
       id:       `conn_${_connCounter++}`,
@@ -154,8 +174,10 @@ export class ConnectionManager {
         for (const c of connsByPort.get(`${el.id}:${j}`) ?? []) {
           const toEl = elemById.get(c.toId);
           if (!toEl) continue;
-          const toSpec = toEl.def.inputs[inputKeys(toEl.def)[c.toPort]];
-          const give   = Math.min(pool, toSpec ? toSpec.demand : 0);
+          const toSpec    = toEl.def.inputs[inputKeys(toEl.def)[c.toPort]];
+          const alreadyGot = received.get(`${c.toId}:${c.toPort}`) ?? 0;
+          const stillNeeds = toSpec ? Math.max(0, toSpec.demand - alreadyGot) : 0;
+          const give       = Math.min(pool, stillNeeds);
           received.set(`${c.toId}:${c.toPort}`, (received.get(`${c.toId}:${c.toPort}`) ?? 0) + give);
           pool          -= give;
           totalAllocated += give;
