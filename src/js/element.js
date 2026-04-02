@@ -1,4 +1,4 @@
-import { ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_COLOR } from './config.js';
+import { ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_COLOR, inputKeys, outputKeys } from './config.js';
 
 let _elemCounter = 0;
 
@@ -9,7 +9,7 @@ export class GameElement {
     this.def  = def;
     this.x    = x;
     this.y    = y;
-    const rows = Math.max(def.inputs.length, def.outputs.length, 1);
+    const rows = Math.max(inputKeys(def).length, outputKeys(def).length, 1);
     this.w = ELEM_W;
     this.h = HEADER_H + rows * ROW_H;
 
@@ -33,7 +33,8 @@ export class GameElement {
   }
 
   hitInputPort(px, py) {
-    for (let i = 0; i < this.def.inputs.length; i++) {
+    const keys = inputKeys(this.def);
+    for (let i = 0; i < keys.length; i++) {
       const p = this.inputPos(i);
       if (Math.hypot(px - p.x, py - p.y) < PORT_HIT) return i;
     }
@@ -41,18 +42,20 @@ export class GameElement {
   }
 
   hitOutputPort(px, py) {
-    for (let i = 0; i < this.def.outputs.length; i++) {
+    const keys = outputKeys(this.def);
+    for (let i = 0; i < keys.length; i++) {
       const p = this.outputPos(i);
       if (Math.hypot(px - p.x, py - p.y) < PORT_HIT) return i;
     }
     return -1;
   }
 
-  draw(ctx, connectedInputs, isActive) {
+  draw(ctx, connectedInputs, activePct, computeResult) {
     const { x, y, w, h, def } = this;
+    const alpha = 0.38 + (activePct / 100) * 0.62;
 
     ctx.save();
-    if (!isActive) ctx.globalAlpha = 0.38;
+    ctx.globalAlpha = alpha;
 
     // Drop shadow
     ctx.save();
@@ -76,6 +79,17 @@ export class GameElement {
     ctx.beginPath();
     ctx.roundRect(x, y, w, HEADER_H, [8, 8, 0, 0]);
     ctx.fill();
+
+    // Semi-active amber overlay on header
+    if (activePct > 0 && activePct < 100) {
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.fillStyle = '#e3b341';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, HEADER_H, [8, 8, 0, 0]);
+      ctx.fill();
+      ctx.restore();
+    }
 
     // Preset highlight border
     if (def.preset) {
@@ -105,17 +119,22 @@ export class GameElement {
     }
 
     // Input ports (left side)
-    for (let i = 0; i < def.inputs.length; i++) {
+    const inKeys = inputKeys(def);
+    for (let i = 0; i < inKeys.length; i++) {
       const p         = this.inputPos(i);
-      const type      = def.inputs[i];
-      const col       = PORT_COLOR[type] || '#888';
+      const portKey   = inKeys[i];
+      const spec      = def.inputs[portKey];
+      const col       = PORT_COLOR[portKey] || '#888';
       const connected = connectedInputs.has(i);
+      const recv      = computeResult?.received.get(`${this.id}:${i}`) ?? 0;
+      const met       = recv >= spec.demand;
+      const label     = `${portKey} ${Math.round(recv)}/${spec.demand}`;
 
-      ctx.fillStyle = '#8b949e';
       ctx.font = '10px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(type, x + PORT_R + 6, p.y);
+      ctx.fillStyle = met ? '#56d364' : '#f85149';
+      ctx.fillText(label, x + PORT_R + 6, p.y);
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, PORT_R, 0, Math.PI * 2);
@@ -127,16 +146,20 @@ export class GameElement {
     }
 
     // Output ports (right side)
-    for (let i = 0; i < def.outputs.length; i++) {
-      const p    = this.outputPos(i);
-      const type = def.outputs[i];
-      const col  = PORT_COLOR[type] || '#888';
+    const outKeys = outputKeys(def);
+    for (let i = 0; i < outKeys.length; i++) {
+      const p       = this.outputPos(i);
+      const portKey = outKeys[i];
+      const spec    = def.outputs[portKey];
+      const col     = PORT_COLOR[portKey] || '#888';
+      const flowVal = computeResult?.flow.get(`${this.id}:${i}`) ?? 0;
+      const label   = `${portKey} ${Math.round(flowVal)}/${spec.supply}`;
 
       ctx.fillStyle = '#8b949e';
       ctx.font = '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(type, x + w - PORT_R - 6, p.y);
+      ctx.fillText(label, x + w - PORT_R - 6, p.y);
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, PORT_R, 0, Math.PI * 2);

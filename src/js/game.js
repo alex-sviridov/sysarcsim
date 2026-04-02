@@ -1,4 +1,4 @@
-import { ELEM_DEFS, HEADER_H, ROW_H } from './config.js';
+import { ELEM_DEFS, HEADER_H, ROW_H, inputKeys, outputKeys } from './config.js';
 import { GameElement } from './element.js';
 import { LEVELS } from './levels.js';
 import { ConnectionManager } from './connection.js';
@@ -65,12 +65,27 @@ export class Game {
       card.className    = 'card';
       card.dataset.type = type;
 
-      const ioLines = [
-        ...def.outputs.map(t => `<span class="out">▶ ${t}</span>`),
-        ...def.inputs.map(t => `<span class="in">◀ ${t}</span>`),
-      ].join('');
+      const nameEl = document.createElement('div');
+      nameEl.className   = 'card-name';
+      nameEl.textContent = def.label;
 
-      card.innerHTML = `<div class="card-name">${def.label}</div><div class="card-io">${ioLines}</div>`;
+      const ioEl = document.createElement('div');
+      ioEl.className = 'card-io';
+      for (const k of outputKeys(def)) {
+        const span = document.createElement('span');
+        span.className   = 'out';
+        span.textContent = `▶ ${k} (${def.outputs[k].supply})`;
+        ioEl.appendChild(span);
+      }
+      for (const k of inputKeys(def)) {
+        const span = document.createElement('span');
+        span.className   = 'in';
+        span.textContent = `◀ ${k} (${def.inputs[k].demand})`;
+        ioEl.appendChild(span);
+      }
+
+      card.appendChild(nameEl);
+      card.appendChild(ioEl);
       container.appendChild(card);
     }
   }
@@ -115,12 +130,11 @@ export class Game {
     }
   }
 
-  // Fix 5 — win check lives in Game, not ConnectionManager
   checkWin() {
     const demands = this.elements.filter(e => e.def.preset);
     if (!demands.length) return;
-    const active = this.connMgr.computeActive(this.elements);
-    this._won = demands.every(d => active.has(d));
+    const result = this.connMgr.computeActivePct(this.elements);
+    this._won = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
     this.winBadge.hidden = !this._won;
     if (this._won) {
       this._setStatus('All demands satisfied.');

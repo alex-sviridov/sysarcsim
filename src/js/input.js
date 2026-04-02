@@ -1,4 +1,4 @@
-import { ELEM_DEFS, PORT_SNAP } from './config.js';
+import { ELEM_DEFS, PORT_SNAP, inputKeys, outputKeys } from './config.js';
 import { GameElement } from './element.js';
 import { LEVELS } from './levels.js';
 
@@ -164,12 +164,13 @@ export class InputHandler {
     let best = null, bestDist = PORT_SNAP;
     for (const el of this.game.elements) {
       if (el === fromElem) continue;
-      for (let i = 0; i < el.def.inputs.length; i++) {
+      const keys = inputKeys(el.def);
+      for (let i = 0; i < keys.length; i++) {
         const p = el.inputPos(i);
         const d = Math.hypot(x - p.x, y - p.y);
         if (d < bestDist) {
           bestDist = d;
-          best = { snapElem: el, snapPort: i, snapValid: el.def.inputs[i] === fromType };
+          best = { snapElem: el, snapPort: i, snapValid: keys[i] === fromType };
         }
       }
     }
@@ -200,7 +201,7 @@ export class InputHandler {
       if (!this.state.moved && Math.hypot(x - this.state.ox, y - this.state.oy) > 4) {
         this.state.moved = true;
       }
-      const fromType = this.state.fromElem.def.outputs[this.state.fromPort];
+      const fromType = outputKeys(this.state.fromElem.def)[this.state.fromPort];
       this.state.snap = this._findSnapTarget(x, y, this.state.fromElem, fromType);
     }
 
