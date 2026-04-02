@@ -1,13 +1,20 @@
 import { bezierPoint } from './bezier.js';
-import { inputKeys, outputKeys } from './config.js';
-
-let _connCounter = 0;
+import { inputKeys, outputKeys, BEZIER_SAMPLES } from './config.js';
+import { Events } from './event-bus.js';
 
 export class ConnectionManager {
-  constructor(game) {
-    this.game = game;
-    this.connections  = [];   // { id, fromId, fromPort, toId, toPort }
-    this.selectedConn = null;
+  static #counter = 0;
+  static resetCounter() { ConnectionManager.#counter = 0; }
+
+  #elemMap;
+  #bus;
+
+  connections  = [];
+  selectedConn = null;
+
+  constructor(elemMap, bus) {
+    this.#elemMap = elemMap;
+    this.#bus     = bus;
   }
 
   reset() {
@@ -15,21 +22,21 @@ export class ConnectionManager {
     this.selectedConn = null;
   }
 
-  _elem(id) {
-    return this.game.elemMap.get(id);
+  #elem(id) {
+    return this.#elemMap.get(id);
   }
 
   mid(c) {
-    const from = this._elem(c.fromId).outputPos(c.fromPort);
-    const to   = this._elem(c.toId).inputPos(c.toPort);
+    const from = this.#elem(c.fromId).outputPos(c.fromPort);
+    const to   = this.#elem(c.toId).inputPos(c.toPort);
     return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
   }
 
   hit(px, py, c) {
-    const from = this._elem(c.fromId).outputPos(c.fromPort);
-    const to   = this._elem(c.toId).inputPos(c.toPort);
-    for (let i = 0; i <= 24; i++) {
-      const p = bezierPoint(from.x, from.y, to.x, to.y, i / 24);
+    const from = this.#elem(c.fromId).outputPos(c.fromPort);
+    const to   = this.#elem(c.toId).inputPos(c.toPort);
+    for (let i = 0; i <= BEZIER_SAMPLES; i++) {
+      const p = bezierPoint(from.x, from.y, to.x, to.y, i / BEZIER_SAMPLES);
       if (Math.hypot(px - p.x, py - p.y) < 8) return true;
     }
     return false;
@@ -38,8 +45,7 @@ export class ConnectionManager {
   delete(c) {
     this.connections = this.connections.filter(x => x !== c);
     if (this.selectedConn === c) this.selectedConn = null;
-    this.game.checkWin();
-    if (!this.game._won) this.game._setStatus('Connect elements to satisfy the demand.');
+    this.#bus.emit(Events.CHECK_WIN, {});
   }
 
   deleteConnectedTo(el) {
@@ -57,7 +63,7 @@ export class ConnectionManager {
     const toType   = inputKeys(toElem.def)[toPort];
 
     if (fromType !== toType) {
-      this.game._setStatus(`Type mismatch: ${fromType} ≠ ${toType}`, 2500);
+      this.#bus.emit(Events.SET_STATUS, { msg: `Type mismatch: ${fromType} ≠ ${toType}`, duration: 2500 });
       return;
     }
 
@@ -82,28 +88,27 @@ export class ConnectionManager {
       );
     }
 
-    // Guard against exact duplicate (same wire redrawn)
+    // Guard against exact duplicate
     if (this.connections.some(
       c => c.fromId === fromElem.id && c.fromPort === fromPort &&
            c.toId === toElem.id   && c.toPort === toPort
     )) return;
 
     this.connections.push({
-      id:       `conn_${_connCounter++}`,
+      id:       `conn_${ConnectionManager.#counter++}`,
       fromId:   fromElem.id,
       fromPort,
       toId:     toElem.id,
       toPort,
     });
-    this.game.checkWin();
+    this.#bus.emit(Events.CHECK_WIN, {});
   }
 
   computeActivePct(elements) {
-    const elemById = this.game.elemMap;
+    const elemById = this.#elemMap;
 
     // --- Step 1: Topological sort (Kahn's algorithm) ---
-    // in-degree = number of distinct upstream element IDs connected to this element
-    const inDegree = new Map();
+    const inDegree   = new Map();
     const downstream = new Map(); // elemId → Set of downstream elemIds
     for (const el of elements) {
       inDegree.set(el.id, new Set());
@@ -137,7 +142,6 @@ export class ConnectionManager {
     const flow      = new Map(); // `${elemId}:${portIdx}` → current output flow
     const received  = new Map(); // `${elemId}:${portIdx}` → received at input
 
-    // Index connections by source port for O(1) lookup during distribution
     const connsByPort = new Map(); // `${fromId}:${fromPort}` → Connection[]
     for (const c of this.connections) {
       const key = `${c.fromId}:${c.fromPort}`;
@@ -149,10 +153,8 @@ export class ConnectionManager {
       const inK = inputKeys(el.def);
 
       if (inK.length === 0) {
-        // Producer: always 100%
         activePct.set(el, 100);
       } else {
-        // Compute activePct from already-populated received values
         let minPct = 100;
         for (let i = 0; i < inK.length; i++) {
           const spec = el.def.inputs[inK[i]];
@@ -163,18 +165,17 @@ export class ConnectionManager {
         activePct.set(el, minPct);
       }
 
-      // Distribute output capacity to downstream consumers (connection creation order)
       const outK = outputKeys(el.def);
       const pct  = activePct.get(el);
       for (let j = 0; j < outK.length; j++) {
-        const spec       = el.def.outputs[outK[j]];
-        let pool         = spec.supply * pct / 100;
+        const spec         = el.def.outputs[outK[j]];
+        let pool           = spec.supply * pct / 100;
         let totalAllocated = 0;
 
         for (const c of connsByPort.get(`${el.id}:${j}`) ?? []) {
           const toEl = elemById.get(c.toId);
           if (!toEl) continue;
-          const toSpec    = toEl.def.inputs[inputKeys(toEl.def)[c.toPort]];
+          const toSpec     = toEl.def.inputs[inputKeys(toEl.def)[c.toPort]];
           const alreadyGot = received.get(`${c.toId}:${c.toPort}`) ?? 0;
           const stillNeeds = toSpec ? Math.max(0, toSpec.demand - alreadyGot) : 0;
           const give       = Math.min(pool, stillNeeds);

@@ -1,0 +1,29 @@
+{
+  "name": "sysarcsim",
+  "version": "1.0.0",
+  "description": "A browser-based game where you play as a system architect. Build system architectures by connecting components to satisfy user demand.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/jest-cli/bin/jest.js"
+  },
+  "jest": {
+    "extensionsToTreatAsEsm": [],
+    "testEnvironment": "node",
+    "transform": {}
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alex-sviridov/sysarcsim.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/alex-sviridov/sysarcsim/issues"
+  },
+  "homepage": "https://github.com/alex-sviridov/sysarcsim#readme",
+  "devDependencies": {
+    "jest": "^30.3.0"
+  }
+}

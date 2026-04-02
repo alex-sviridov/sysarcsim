@@ -1,60 +1,60 @@
-import { PORT_COLOR, outputKeys } from './config.js';
+import { PORT_COLOR, outputKeys, GRID_SIZE, REMOVE_ICON_R, SNAP_INDICATOR_R } from './config.js';
 import { drawBezier } from './bezier.js';
 
 export class Renderer {
+  #ctx;
+  #cssW = 0;
+  #cssH = 0;
+
   constructor(canvas) {
-    this.ctx   = canvas.getContext('2d');
-    this._cssW = 0;
-    this._cssH = 0;
+    this.#ctx = canvas.getContext('2d');
   }
 
   resize(w, h, dpr) {
-    this._cssW = w;
-    this._cssH = h;
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.#cssW = w;
+    this.#cssH = h;
+    this.#ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   render(game) {
-    const W = this._cssW;
-    const H = this._cssH;
+    const W = this.#cssW;
+    const H = this.#cssH;
     if (!W || !H) return;
 
-    const input  = game.input;
+    const { state, selectedEl, ghostElem, mx, my } = game.input.getRenderState();
     const result = game.connMgr.computeActivePct(game.elements);
 
-    this._drawGrid(W, H);
-    this._drawConnections(game.connMgr.connections, result, game.elemMap);
-    this._drawWireInProgress(input.state);
-    this._drawElements(game.elements, game.connMgr.connections, result);
-    this._drawSnapIndicator(input.state);
-    this._drawSelectionOutline(input.selectedEl);
-    this._drawGhost(input._ghostElem, input._mx, input._my);
+    this.#drawGrid(W, H);
+    this.#drawConnections(game.connMgr.connections, result, game.elemMap);
+    this.#drawWireInProgress(state);
+    this.#drawElements(game.elements, game.connMgr.connections, result);
+    this.#drawSnapIndicator(state);
+    this.#drawSelectionOutline(selectedEl);
+    this.#drawGhost(ghostElem, mx, my);
 
     if (game.connMgr.selectedConn) {
       const m = game.connMgr.mid(game.connMgr.selectedConn);
-      this._drawRemoveIcon(m.x, m.y);
+      this.#drawRemoveIcon(m.x, m.y);
     }
-    if (input.selectedEl && !input.selectedEl.def.preset) {
-      const el = input.selectedEl;
-      this._drawRemoveIcon(el.x + el.w, el.y);
+    if (selectedEl && !selectedEl.def.preset) {
+      this.#drawRemoveIcon(selectedEl.x + selectedEl.w, selectedEl.y);
     }
   }
 
-  _drawGrid(W, H) {
-    const { ctx } = this;
+  #drawGrid(W, H) {
+    const ctx = this.#ctx;
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#1c2128';
-    const gs = 28;
-    for (let gx = gs; gx < W; gx += gs) {
-      for (let gy = gs; gy < H; gy += gs) {
+    for (let gx = GRID_SIZE; gx < W; gx += GRID_SIZE) {
+      for (let gy = GRID_SIZE; gy < H; gy += GRID_SIZE) {
         ctx.fillRect(gx - 1, gy - 1, 2, 2);
       }
     }
   }
 
-  _drawConnections(connections, result, elemMap) {
-    const { ctx } = this;
+  #drawConnections(connections, result, elemMap) {
+    const ctx = this.#ctx;
     for (const c of connections) {
       const fromElem = elemMap.get(c.fromId);
       const toElem   = elemMap.get(c.toId);
@@ -76,9 +76,9 @@ export class Renderer {
     }
   }
 
-  _drawWireInProgress(state) {
+  #drawWireInProgress(state) {
     if (state?.mode !== 'wire') return;
-    const { ctx } = this;
+    const ctx = this.#ctx;
     const { fromElem, fromPort, mx, my, snap } = state;
     const from      = fromElem.outputPos(fromPort);
     const portKey   = outputKeys(fromElem.def)[fromPort];
@@ -94,20 +94,20 @@ export class Renderer {
     drawBezier(ctx, from.x, from.y, tx, ty, wireColor, 2, true);
   }
 
-  _drawElements(elements, connections, result) {
+  #drawElements(elements, connections, result) {
     const connMap = new Map(); // elemId → Set<portIndex>
     for (const c of connections) {
       if (!connMap.has(c.toId)) connMap.set(c.toId, new Set());
       connMap.get(c.toId).add(c.toPort);
     }
     for (const el of elements) {
-      el.draw(this.ctx, connMap.get(el.id) || new Set(), result.activePct.get(el) ?? 0, result);
+      el.draw(this.#ctx, connMap.get(el.id) || new Set(), result.activePct.get(el) ?? 0, result);
     }
   }
 
-  _drawSnapIndicator(state) {
+  #drawSnapIndicator(state) {
     if (state?.mode !== 'wire' || !state.snap) return;
-    const { ctx } = this;
+    const ctx = this.#ctx;
     const { snap, fromElem, fromPort } = state;
     const portKey   = outputKeys(fromElem.def)[fromPort];
     const portColor = PORT_COLOR[portKey] || '#888';
@@ -119,7 +119,7 @@ export class Renderer {
     ctx.lineWidth   = 2.5;
     ctx.globalAlpha = 0.85;
     ctx.beginPath();
-    ctx.arc(tx, ty, 11, 0, Math.PI * 2);
+    ctx.arc(tx, ty, SNAP_INDICATOR_R, 0, Math.PI * 2);
     ctx.stroke();
 
     if (!snap.snapValid) {
@@ -132,9 +132,9 @@ export class Renderer {
     ctx.restore();
   }
 
-  _drawSelectionOutline(selectedEl) {
+  #drawSelectionOutline(selectedEl) {
     if (!selectedEl) return;
-    const { ctx } = this;
+    const ctx = this.#ctx;
     const el = selectedEl;
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.lineWidth = 2;
@@ -145,17 +145,17 @@ export class Renderer {
     ctx.setLineDash([]);
   }
 
-  _drawGhost(ghostElem, mx, my) {
+  #drawGhost(ghostElem, mx, my) {
     if (!ghostElem) return;
     ghostElem.x = mx - ghostElem.w / 2;
     ghostElem.y = my - ghostElem.h / 2;
-    ghostElem.draw(this.ctx, new Set(), 50, null);
+    ghostElem.draw(this.#ctx, new Set(), 50, null);
   }
 
-  _drawRemoveIcon(cx, cy) {
-    const { ctx } = this;
+  #drawRemoveIcon(cx, cy) {
+    const ctx = this.#ctx;
     ctx.beginPath();
-    ctx.arc(cx, cy, 9, 0, Math.PI * 2);
+    ctx.arc(cx, cy, REMOVE_ICON_R, 0, Math.PI * 2);
     ctx.fillStyle = '#da3633';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';

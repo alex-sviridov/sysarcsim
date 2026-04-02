@@ -5,6 +5,12 @@ export const PORT_R    = 7;    // visual radius
 export const PORT_HIT  = 12;   // hit-test radius (larger for usability)
 export const PORT_SNAP = 28;   // snap-to radius while dragging a wire
 
+export const GRID_SIZE         = 28;  // canvas background dot grid spacing
+export const REMOVE_ICON_R     = 9;   // radius of the red remove-icon circle
+export const REMOVE_HIT_R      = 12;  // hit-test radius for remove icons
+export const SNAP_INDICATOR_R  = 11;  // radius of the snap ring drawn near target port
+export const BEZIER_SAMPLES    = 24;  // sample count for bezier hit-testing
+
 export const PORT_COLOR = {
   WebSite:   '#79c0ff',
   SQL:       '#56d364',
@@ -29,8 +35,8 @@ export const ELEM_DEFS = {
   },
   Database: {
     label:   'Database',
-    inputs:  { Storage: { demand: 10, multipath: true } },
-    outputs: { SQL: { supply: 20 } },
+    inputs:  { Storage: { demand: 85, multipath: true } },
+    outputs: { SQL: { supply: 50 } },
     color:   '#388bfd',
     icon:    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><ellipse cx="10" cy="5" rx="7" ry="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="5" x2="3" y2="15" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="5" x2="17" y2="15" stroke="currentColor" stroke-width="1.5"/><ellipse cx="10" cy="15" rx="7" ry="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
   },

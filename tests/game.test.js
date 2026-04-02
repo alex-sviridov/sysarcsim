@@ -1,0 +1,438 @@
+/**
+ * Tests for Game class logic.
+ *
+ * Game is heavily coupled to the DOM and to rendering/input subsystems.
+ * We test it by:
+ *  1. Stubbing all browser globals before module import
+ *  2. Exercising public methods and observable state
+ */
+
+import { GameElement }       from '../src/js/element.js';
+import { ConnectionManager } from '../src/js/connection.js';
+import { ELEM_DEFS, HEADER_H, ROW_H } from '../src/js/config.js';
+import { LEVELS } from '../src/js/levels.js';
+
+// ── Browser global stubs (must be set before Game import) ────────────────
+
+global.Image = class {
+  constructor() { this.src = ''; this.complete = false; this.naturalWidth = 0; }
+};
+
+function makeCtxStub() {
+  return new Proxy({}, {
+    get(_, prop) {
+      if (prop === 'measureText') return () => ({ width: 0 });
+      return () => {};
+    },
+    set() { return true; },
+  });
+}
+
+// Minimal DOM node factory (supports addEventListener, classList, dataset, style, etc.)
+function makeNode(tagName = 'div') {
+  const listeners = {};
+  const node = {
+    tagName,
+    textContent: '',
+    innerHTML:   '',
+    hidden:      false,
+    className:   '',
+    dataset:     {},
+    style:       {},
+    children:    [],
+    classList: {
+      _classes: new Set(),
+      add(c)    { this._classes.add(c); },
+      remove(c) { this._classes.delete(c); },
+      contains(c) { return this._classes.has(c); },
+    },
+    addEventListener(ev, fn) {
+      if (!listeners[ev]) listeners[ev] = [];
+      listeners[ev].push(fn);
+    },
+    _fire(ev, data) {
+      for (const fn of listeners[ev] ?? []) fn(data ?? {});
+    },
+    appendChild(child) { this.children.push(child); return child; },
+    querySelectorAll(sel) { return []; },
+    closest(sel)  { return null; },
+    getContext()  { return makeCtxStub(); },
+    getBoundingClientRect() { return { width: 800, height: 600, left: 0, top: 0 }; },
+    width:  800,
+    height: 600,
+  };
+  return node;
+}
+
+function makeDocumentStub() {
+  const nodes = {
+    'desk':           makeNode('canvas'),
+    'status':         makeNode(),
+    'win-badge':      makeNode(),
+    'btn-next-level': makeNode(),
+    'sidebar':        makeNode(),
+    'sidebar-cards':  makeNode(),
+    'btn-reset':      makeNode(),
+    'level-title':    makeNode(),
+  };
+
+  return {
+    _nodes: nodes,
+    getElementById(id) { return nodes[id] ?? null; },
+    createElement(tag) { return makeNode(tag); },
+    querySelectorAll(sel) { return []; },
+    addEventListener() {},
+  };
+}
+
+const fakeDoc = makeDocumentStub();
+global.document = fakeDoc;
+
+global.window = {
+  devicePixelRatio: 1,
+  addEventListener: () => {},
+};
+
+global.requestAnimationFrame = () => {};
+global.setTimeout  = () => 0;
+global.clearTimeout = () => {};
+
+// ── Import Game after globals are set ─────────────────────────────────────
+
+const { Game } = await import('../src/js/game.js');
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+function resetFakeDoc() {
+  const nodes = fakeDoc._nodes;
+  nodes['win-badge'].hidden  = true;
+  nodes['btn-next-level'].hidden = true;
+  nodes['status'].textContent = '';
+}
+
+function freshGame() {
+  GameElement.resetCounter();
+  ConnectionManager.resetCounter();
+  resetFakeDoc();
+  return new Game();
+}
+
+// ── Constructor ───────────────────────────────────────────────────────────
+
+describe('Game constructor', () => {
+  test('creates without throwing', () => {
+    expect(() => freshGame()).not.toThrow();
+  });
+
+  test('levelIndex starts at 0', () => {
+    const game = freshGame();
+    expect(game.levelIndex).toBe(0);
+  });
+
+  test('elements array is populated with demand elements from level 0', () => {
+    const game = freshGame();
+    expect(game.elements.length).toBe(LEVELS[0].demands.length);
+  });
+
+  test('elemMap mirrors elements array', () => {
+    const game = freshGame();
+    expect(game.elemMap.size).toBe(game.elements.length);
+    for (const el of game.elements) {
+      expect(game.elemMap.get(el.id)).toBe(el);
+    }
+  });
+
+  test('all demand elements have def.preset truthy', () => {
+    const game = freshGame();
+    for (const el of game.elements) {
+      expect(el.def.preset).toBeTruthy();
+    }
+  });
+
+  test('canvas property points to the canvas element', () => {
+    const game = freshGame();
+    expect(game.canvas).toBe(fakeDoc._nodes['desk']);
+  });
+
+  test('connMgr is a ConnectionManager', () => {
+    const game = freshGame();
+    expect(game.connMgr).toBeInstanceOf(ConnectionManager);
+  });
+
+  test('win badge is hidden initially', () => {
+    const game = freshGame();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+
+  test('next level button is hidden initially', () => {
+    const game = freshGame();
+    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+  });
+
+  test('status message is set after construction', () => {
+    freshGame();
+    expect(fakeDoc._nodes['status'].textContent.length).toBeGreaterThan(0);
+  });
+});
+
+// ── reset() ───────────────────────────────────────────────────────────────
+
+describe('Game.reset()', () => {
+  test('repopulates elements to match level demand count', () => {
+    const game = freshGame();
+    const expected = LEVELS[0].demands.length;
+    // Add an extra element to verify reset clears it
+    game.elements.push({ id: 'fake', def: {} });
+    game.reset();
+    expect(game.elements.length).toBe(expected);
+  });
+
+  test('clears connections', () => {
+    const game = freshGame();
+    game.connMgr.connections.push({ id: 'fake' });
+    game.reset();
+    expect(game.connMgr.connections).toHaveLength(0);
+  });
+
+  test('hides win badge on reset', () => {
+    const game = freshGame();
+    fakeDoc._nodes['win-badge'].hidden = false;
+    game.reset();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+
+  test('hides next level button on reset', () => {
+    const game = freshGame();
+    fakeDoc._nodes['btn-next-level'].hidden = false;
+    game.reset();
+    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+  });
+
+  test('elemMap has same size as elements array after reset', () => {
+    const game = freshGame();
+    game.reset();
+    expect(game.elemMap.size).toBe(game.elements.length);
+  });
+
+  test('demand elements are spaced vertically', () => {
+    const game = freshGame();
+    const demandH = HEADER_H + ROW_H;
+    const gap     = 16;
+    for (let i = 1; i < game.elements.length; i++) {
+      const dy = game.elements[i].y - game.elements[i - 1].y;
+      expect(dy).toBeGreaterThanOrEqual(demandH + gap - 1);
+    }
+  });
+
+  test('sets a non-empty status message', () => {
+    const game = freshGame();
+    fakeDoc._nodes['status'].textContent = '';
+    game.reset();
+    expect(fakeDoc._nodes['status'].textContent.length).toBeGreaterThan(0);
+  });
+
+  test('resets GameElement counter (IDs restart from 0)', () => {
+    const game = freshGame();
+    game.reset();
+    // After reset, first demand element should be elem_0
+    expect(game.elements[0].id).toBe('elem_0');
+  });
+});
+
+// ── checkWin() ────────────────────────────────────────────────────────────
+
+describe('Game.checkWin()', () => {
+  test('does not show win badge when demands have no supply', () => {
+    const game = freshGame();
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+
+  test('returns without throwing when elements list is empty', () => {
+    const game = freshGame();
+    game.elements.length = 0;
+    expect(() => game.checkWin()).not.toThrow();
+  });
+
+  test('returns without throwing when no preset elements exist', () => {
+    const game = freshGame();
+    for (const el of game.elements) el.def = { ...el.def, preset: false };
+    expect(() => game.checkWin()).not.toThrow();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+
+  test('shows win badge when computeActivePct returns 100% for all demands', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(false);
+  });
+
+  test('hides win badge when demands are only partially satisfied (50%)', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 50);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+
+  test('sets status text to a satisfaction message when won', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/satisfied/i);
+  });
+
+  test('shows next level button when won and not on last level', () => {
+    if (LEVELS.length < 2) return; // skip if only one level
+    const game = freshGame();
+    expect(game.levelIndex).toBe(0);
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(false);
+  });
+
+  test('hides next level button when on the last level', () => {
+    const game = freshGame();
+    game.levelIndex = LEVELS.length - 1;
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+  });
+
+  test('hides next level button when demands are not fully satisfied', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 99);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+  });
+});
+
+// ── ConnectionManager integration ─────────────────────────────────────────
+
+describe('ConnectionManager used by Game', () => {
+  test('connMgr.reset() empties connections', () => {
+    const game = freshGame();
+    game.connMgr.connections.push({ id: 'c0', fromId: 'x', toId: 'y', fromPort: 0, toPort: 0 });
+    game.connMgr.reset();
+    expect(game.connMgr.connections).toHaveLength(0);
+  });
+
+  test('connMgr.selectedConn is null after reset', () => {
+    const game = freshGame();
+    game.connMgr.selectedConn = { id: 'fake' };
+    game.connMgr.reset();
+    expect(game.connMgr.selectedConn).toBeNull();
+  });
+});
+
+// ── Element management ────────────────────────────────────────────────────
+
+describe('manual element placement and deletion', () => {
+  test('adding element to elements + elemMap stays consistent', () => {
+    const game = freshGame();
+    const def  = ELEM_DEFS.Storage;
+    const el   = new GameElement('Storage', 100, 100, def);
+    game.elements.push(el);
+    game.elemMap.set(el.id, el);
+    expect(game.elements.length).toBe(LEVELS[0].demands.length + 1);
+    expect(game.elemMap.get(el.id)).toBe(el);
+  });
+
+  test('deleting element removes it from elements and elemMap', () => {
+    const game = freshGame();
+    const def  = ELEM_DEFS.Storage;
+    const el   = new GameElement('Storage', 100, 100, def);
+    game.elements.push(el);
+    game.elemMap.set(el.id, el);
+
+    game.connMgr.deleteConnectedTo(el);
+    game.elements.splice(game.elements.indexOf(el), 1);
+    game.elemMap.delete(el.id);
+
+    expect(game.elemMap.has(el.id)).toBe(false);
+    expect(game.elements.includes(el)).toBe(false);
+  });
+
+  test('deleting element that has connections removes those connections', () => {
+    const game = freshGame();
+    const storDef  = ELEM_DEFS.Storage;
+    const dbDef    = ELEM_DEFS.Database;
+    const src = new GameElement('Storage',  0, 0, storDef);
+    const dst = new GameElement('Database', 300, 0, dbDef);
+    game.elements.push(src, dst);
+    game.elemMap.set(src.id, src);
+    game.elemMap.set(dst.id, dst);
+
+    game.connMgr.connections.push({
+      id: 'c0', fromId: src.id, fromPort: 0, toId: dst.id, toPort: 0
+    });
+    expect(game.connMgr.connections).toHaveLength(1);
+
+    game.connMgr.deleteConnectedTo(src);
+    expect(game.connMgr.connections).toHaveLength(0);
+  });
+});
+
+// ── Level data integrity ──────────────────────────────────────────────────
+
+describe('LEVELS data used by Game', () => {
+  test('each level has at least one demand element', () => {
+    for (const level of LEVELS) {
+      expect(level.demands.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('each demand element def has a type field', () => {
+    for (const level of LEVELS) {
+      for (const demand of level.demands) {
+        expect(typeof demand.type).toBe('string');
+      }
+    }
+  });
+
+  test('each demand element def has preset truthy', () => {
+    for (const level of LEVELS) {
+      for (const demand of level.demands) {
+        expect(demand.preset).toBeTruthy();
+      }
+    }
+  });
+
+  test('each level has a non-empty available array', () => {
+    for (const level of LEVELS) {
+      expect(level.available.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('each available type is a valid key in ELEM_DEFS', () => {
+    for (const level of LEVELS) {
+      for (const type of level.available) {
+        expect(ELEM_DEFS).toHaveProperty(type);
+      }
+    }
+  });
+});

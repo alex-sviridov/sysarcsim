@@ -3,3 +3,7 @@
 - zoom in/out with mouse and buttons, movable board with center button
 - multiadd when shift is pressed
 - when not full production power is possible, limit the largest based on the minimal
+- add measurement units
+- add icons to static consumers in level
+- move elements and levels to json
+- logic for load balancer and other transit elements (no demand)

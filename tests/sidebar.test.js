@@ -1,0 +1,400 @@
+/**
+ * Tests for the Sidebar class in src/js/sidebar.js
+ *
+ * Sidebar interacts with the DOM heavily. We build a rich DOM stub before
+ * importing so the module-level references resolve correctly.
+ */
+
+import { jest } from '@jest/globals';
+import { EventBus, Events } from '../src/js/event-bus.js';
+import { ELEM_DEFS } from '../src/js/config.js';
+
+// ── Browser stubs ─────────────────────────────────────────────────────────────
+
+global.Image = class {
+  constructor() { this.src = ''; this.complete = false; this.naturalWidth = 0; }
+};
+
+// ── Smart DOM node factory ────────────────────────────────────────────────────
+
+function makeNode(tagName = 'div') {
+  const listeners = {};
+  const children  = [];
+
+  const node = {
+    tagName,
+    textContent: '',
+    innerHTML:   '',
+    hidden:      false,
+    className:   '',
+    dataset:     {},
+    style:       {},
+    get children() { return children; },
+    classList: {
+      _classes: new Set(),
+      add(c)      { this._classes.add(c); },
+      remove(c)   { this._classes.delete(c); },
+      contains(c) { return this._classes.has(c); },
+      toggle(c)   { if (this._classes.has(c)) this._classes.delete(c); else this._classes.add(c); },
+    },
+    addEventListener(ev, fn) {
+      if (!listeners[ev]) listeners[ev] = [];
+      listeners[ev].push(fn);
+    },
+    _fire(ev, data) {
+      for (const fn of listeners[ev] ?? []) fn(data ?? {});
+    },
+    _listeners: listeners,
+    appendChild(child) {
+      children.push(child);
+      child._parent = node;
+      return child;
+    },
+    removeChild(child) {
+      const idx = children.indexOf(child);
+      if (idx !== -1) children.splice(idx, 1);
+    },
+    // querySelectorAll: search own children recursively
+    querySelectorAll(sel) {
+      const results = [];
+      function walk(el) {
+        if (!el.children) return;
+        for (const child of el.children) {
+          if (matchesSel(child, sel)) results.push(child);
+          walk(child);
+        }
+      }
+      walk(node);
+      return results;
+    },
+    // closest: walk up the parent chain
+    closest(sel) {
+      let cur = node;
+      while (cur) {
+        if (matchesSel(cur, sel)) return cur;
+        cur = cur._parent ?? null;
+      }
+      return null;
+    },
+    getContext() { return new Proxy({}, { get() { return () => {}; }, set() { return true; } }); },
+    getBoundingClientRect() { return { width: 800, height: 600, left: 0, top: 0 }; },
+    width: 800, height: 600,
+    _parent: null,
+    // For innerHTML = '' → clear children
+    set innerHTML(v) {
+      if (v === '') children.length = 0;
+    },
+    get innerHTML() { return ''; },
+    // prevent
+    preventDefault: jest.fn(),
+  };
+  return node;
+}
+
+/**
+ * Very small CSS-selector matcher for the patterns Sidebar actually uses:
+ *  '#sidebar-cards .card--active'
+ *  '.card[data-type]'
+ *
+ * We check both className (string) and classList._classes (Set) so that
+ * both `node.className = 'card'` and `node.classList.add('card')` work.
+ */
+function hasClass(node, cls) {
+  if (!node || !node.classList) return false;
+  if (node.classList._classes.has(cls)) return true;
+  // Also check the plain className string
+  const cn = node.className || '';
+  return cn.split(/\s+/).includes(cls);
+}
+
+function matchesSel(node, sel) {
+  if (!node || typeof node !== 'object') return false;
+
+  // Pattern: '.className[data-attr]' → check class and dataset
+  const attrMatch = sel.match(/^\.([^[]+)\[data-([^\]]+)\]$/);
+  if (attrMatch) {
+    const cls  = attrMatch[1];
+    const attr = attrMatch[2];
+    return hasClass(node, cls) && (attr in (node.dataset || {}));
+  }
+
+  // Pattern: '.className' → check class
+  const classOnly = sel.match(/^\.([^\s.[#]+)$/);
+  if (classOnly) {
+    return hasClass(node, classOnly[1]);
+  }
+
+  return false;
+}
+
+// ── Document stub factory ─────────────────────────────────────────────────────
+
+function makeDocumentStub() {
+  const sidebarNode    = makeNode('div');
+  const sidebarCards   = makeNode('div');
+  const btnNextLevel   = makeNode('button');
+  const btnReset       = makeNode('button');
+  const levelTitle     = makeNode('div');
+  const desk           = makeNode('canvas');
+
+  const nodes = {
+    sidebar:          sidebarNode,
+    'sidebar-cards':  sidebarCards,
+    'btn-next-level': btnNextLevel,
+    'btn-reset':      btnReset,
+    'level-title':    levelTitle,
+    desk,
+    'win-badge':      makeNode('div'),
+    status:           makeNode('div'),
+  };
+
+  return {
+    _nodes: nodes,
+    getElementById(id) { return nodes[id] ?? null; },
+    createElement(tag) {
+      const n = makeNode(tag);
+      n.innerHTML = ''; // writable dummy
+      return n;
+    },
+    querySelectorAll(sel) {
+      // Delegate to the sidebar-cards node for '.card--active' queries
+      if (sel.includes('sidebar-cards')) {
+        return sidebarCards.querySelectorAll(sel.replace(/^#sidebar-cards\s*/, ''));
+      }
+      return [];
+    },
+    addEventListener() {},
+  };
+}
+
+// ── Apply global document before importing Sidebar ────────────────────────────
+
+let fakeDoc = makeDocumentStub();
+global.document = fakeDoc;
+
+global.window = { devicePixelRatio: 1, addEventListener() {} };
+global.requestAnimationFrame = () => {};
+global.setTimeout  = () => 0;
+global.clearTimeout = () => {};
+
+const { Sidebar } = await import('../src/js/sidebar.js');
+
+// ── Test helpers ──────────────────────────────────────────────────────────────
+
+function freshSetup() {
+  fakeDoc = makeDocumentStub();
+  global.document = fakeDoc;
+  const bus     = new EventBus();
+  const sidebar = new Sidebar(bus);
+  return { bus, sidebar, nodes: fakeDoc._nodes };
+}
+
+function level1() {
+  return {
+    title:     'Level 1 — Web Service',
+    demands:   [],
+    available: ['WebServer', 'Database'],
+  };
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('Sidebar constructor', () => {
+  test('does not throw', () => {
+    expect(() => freshSetup()).not.toThrow();
+  });
+});
+
+describe('Sidebar.build()', () => {
+  test('sets level-title.textContent to level.title', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+    expect(nodes['level-title'].textContent).toBe('Level 1 — Web Service');
+  });
+
+  test('creates correct number of cards (one per available type)', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    expect(cards).toHaveLength(2);
+  });
+
+  test('each card has dataset.type set to the type', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const types = cards.map(c => c.dataset.type);
+    expect(types).toContain('WebServer');
+    expect(types).toContain('Database');
+  });
+
+  test('each card has a child with class "card-name" and correct label text', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      const nameEl = card.querySelectorAll('.card-name')[0];
+      expect(nameEl).toBeDefined();
+      const def = ELEM_DEFS[card.dataset.type];
+      expect(nameEl.textContent).toBe(def.label);
+    }
+  });
+
+  test('each card has output spans with class "out" for each output key', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      const def     = ELEM_DEFS[card.dataset.type];
+      const outKeys = Object.keys(def.outputs);
+      const outSpans = card.querySelectorAll('.out');
+      expect(outSpans).toHaveLength(outKeys.length);
+    }
+  });
+
+  test('each card has input spans with class "in" for each input key', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      const def    = ELEM_DEFS[card.dataset.type];
+      const inKeys = Object.keys(def.inputs);
+      const inSpans = card.querySelectorAll('.in');
+      expect(inSpans).toHaveLength(inKeys.length);
+    }
+  });
+});
+
+describe('Sidebar.clearPending()', () => {
+  test('emits PENDING_CHANGED with { type: null, ghostElem: null }', () => {
+    const { sidebar, bus } = freshSetup();
+    const fn = jest.fn();
+    bus.on(Events.PENDING_CHANGED, fn);
+    sidebar.clearPending();
+    expect(fn).toHaveBeenCalledWith({ type: null, ghostElem: null });
+  });
+
+  test('removes card--active from any active cards', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(level1());
+
+    // Manually add card--active to the first card
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    cards[0].classList.add('card--active');
+
+    sidebar.clearPending();
+
+    for (const card of cards) {
+      expect(card.classList.contains('card--active')).toBe(false);
+    }
+  });
+});
+
+describe('Sidebar card click interactions', () => {
+  function makeCardEvent(card) {
+    // Simulate a mousedown event whose target is a leaf inside the card.
+    // We need .closest('.card[data-type]') to return the card itself.
+    const target = makeNode('div');
+    target._parent = card;
+    target.closest = (sel) => {
+      // Walk up
+      let cur = target;
+      while (cur) {
+        if (matchesSel(cur, sel)) return cur;
+        cur = cur._parent ?? null;
+      }
+      return null;
+    };
+
+    return {
+      target,
+      preventDefault: jest.fn(),
+    };
+  }
+
+  test('clicking card emits PENDING_CHANGED with { type, ghostElem } where ghostElem is not null', () => {
+    const { sidebar, bus, nodes } = freshSetup();
+    sidebar.build(level1());
+    const fn = jest.fn();
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    const cards   = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const card    = cards[0]; // WebServer
+    const event   = makeCardEvent(card);
+
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    // clearPending emits first, then the card click emits with a ghostElem
+    const lastCall = fn.mock.calls[fn.mock.calls.length - 1][0];
+    expect(lastCall.type).toBe('WebServer');
+    expect(lastCall.ghostElem).not.toBeNull();
+  });
+
+  test('clicking card emits SIDEBAR_DRAG_START', () => {
+    const { sidebar, bus, nodes } = freshSetup();
+    sidebar.build(level1());
+    const fn = jest.fn();
+    bus.on(Events.SIDEBAR_DRAG_START, fn);
+
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const event = makeCardEvent(cards[0]);
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  test('clicking same card again (toggle) emits PENDING_CHANGED with null type', () => {
+    const { sidebar, bus, nodes } = freshSetup();
+    sidebar.build(level1());
+
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const event = makeCardEvent(cards[0]);
+
+    // First click — select
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    const fn = jest.fn();
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    // Second click — toggle off
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    const found = fn.mock.calls.some(([d]) => d.type === null && d.ghostElem === null);
+    expect(found).toBe(true);
+  });
+
+  test('clicking sidebar background (not a card) calls clearPending (emits PENDING_CHANGED null)', () => {
+    const { sidebar, bus, nodes } = freshSetup();
+    sidebar.build(level1());
+    const fn = jest.fn();
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    // Fire mousedown on the sidebar node with a target that is NOT a card
+    const bgTarget = makeNode('div');
+    bgTarget._parent = nodes['sidebar'];
+    bgTarget.closest = () => null;
+
+    nodes['sidebar']._fire('mousedown', { target: bgTarget });
+
+    const found = fn.mock.calls.some(([d]) => d.type === null);
+    expect(found).toBe(true);
+  });
+});
+
+describe('Sidebar button events', () => {
+  test('btn-reset click emits GAME_RESET', () => {
+    const { bus, nodes } = freshSetup();
+    const fn = jest.fn();
+    bus.on(Events.GAME_RESET, fn);
+    nodes['btn-reset']._fire('click');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  test('btn-next-level click emits LEVEL_NEXT', () => {
+    const { bus, nodes } = freshSetup();
+    const fn = jest.fn();
+    bus.on(Events.LEVEL_NEXT, fn);
+    nodes['btn-next-level']._fire('click');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});

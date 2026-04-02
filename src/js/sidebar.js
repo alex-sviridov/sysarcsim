@@ -1,0 +1,98 @@
+import { ELEM_DEFS, inputKeys, outputKeys } from './config.js';
+import { GameElement } from './element.js';
+import { LEVELS } from './levels.js';
+import { Events } from './event-bus.js';
+
+export class Sidebar {
+  #bus;
+  #pendingType = null;
+  #ghostElem   = null;
+
+  constructor(bus) {
+    this.#bus = bus;
+    this.#bindButtons();
+  }
+
+  build(level) {
+    this.clearPending();
+
+    const titleEl   = document.getElementById('level-title');
+    const container = document.getElementById('sidebar-cards');
+
+    titleEl.textContent = level.title;
+    container.innerHTML = '';
+
+    for (const type of level.available) {
+      const def  = ELEM_DEFS[type];
+      const card = document.createElement('div');
+      card.className    = 'card';
+      card.dataset.type = type;
+
+      const nameEl = document.createElement('div');
+      nameEl.className   = 'card-name';
+      nameEl.textContent = def.label;
+
+      const ioEl = document.createElement('div');
+      ioEl.className = 'card-io';
+      for (const k of outputKeys(def)) {
+        const span = document.createElement('span');
+        span.className   = 'out';
+        span.textContent = `▶ ${k} (${def.outputs[k].supply})`;
+        ioEl.appendChild(span);
+      }
+      for (const k of inputKeys(def)) {
+        const span = document.createElement('span');
+        span.className   = 'in';
+        span.textContent = `◀ ${k} (${def.inputs[k].demand})`;
+        ioEl.appendChild(span);
+      }
+
+      card.appendChild(nameEl);
+      card.appendChild(ioEl);
+      container.appendChild(card);
+    }
+  }
+
+  clearPending() {
+    this.#pendingType = null;
+    this.#ghostElem   = null;
+    document.querySelectorAll('#sidebar-cards .card--active')
+      .forEach(c => c.classList.remove('card--active'));
+    this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
+  }
+
+  #bindButtons() {
+    const sidebar = document.getElementById('sidebar');
+    const cards   = document.getElementById('sidebar-cards');
+    const nextBtn = document.getElementById('btn-next-level');
+
+    sidebar.addEventListener('mousedown', e => {
+      if (!e.target.closest('.card[data-type]')) this.clearPending();
+    });
+
+    cards.addEventListener('mousedown', e => {
+      const card = e.target.closest('.card[data-type]');
+      if (!card) return;
+      e.preventDefault();
+      const type = card.dataset.type;
+      if (this.#pendingType === type) {
+        this.clearPending();
+      } else {
+        this.clearPending();
+        this.#pendingType = type;
+        this.#ghostElem   = new GameElement(type, 0, 0, ELEM_DEFS[type]);
+        card.classList.add('card--active');
+        this.#bus.emit(Events.PENDING_CHANGED, { type, ghostElem: this.#ghostElem });
+        this.#bus.emit(Events.SIDEBAR_DRAG_START, {});
+      }
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      this.#bus.emit(Events.GAME_RESET, {});
+    });
+
+    nextBtn.addEventListener('click', () => {
+      this.#bus.emit(Events.LEVEL_NEXT, {});
+    });
+  }
+}

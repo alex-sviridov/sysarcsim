@@ -1,10 +1,13 @@
 import { ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_COLOR, inputKeys, outputKeys } from './config.js';
 
-let _elemCounter = 0;
-
 export class GameElement {
+  static #counter = 0;
+  static resetCounter() { GameElement.#counter = 0; }
+
+  #iconImg = null;
+
   constructor(type, x, y, def) {
-    this.id   = `elem_${_elemCounter++}`;
+    this.id   = `elem_${GameElement.#counter++}`;
     this.type = type;
     this.def  = def;
     this.x    = x;
@@ -14,8 +17,8 @@ export class GameElement {
     this.h = HEADER_H + rows * ROW_H;
 
     if (def.icon) {
-      this._iconImg = new Image();
-      this._iconImg.src = 'data:image/svg+xml,' + encodeURIComponent(def.icon.replace(/currentColor/g, '#ffffff'));
+      this.#iconImg = new Image();
+      this.#iconImg.src = 'data:image/svg+xml,' + encodeURIComponent(def.icon.replace(/currentColor/g, '#ffffff'));
     }
   }
 
@@ -105,7 +108,7 @@ export class GameElement {
     ctx.font = 'bold 12px monospace';
     ctx.textBaseline = 'middle';
     const iconSize = 14;
-    const iconImg  = this._iconImg;
+    const iconImg  = this.#iconImg;
     if (iconImg?.complete && iconImg.naturalWidth > 0) {
       const textW  = ctx.measureText(def.label).width;
       const totalW = iconSize + 4 + textW;
