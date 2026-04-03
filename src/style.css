@@ -107,6 +107,16 @@ body {
   cursor: cell;
 }
 
+.card--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card--disabled:hover {
+  background: #21262d;
+  border-color: #30363d;
+}
+
 .card-name {
   font-size: 13px;
   font-weight: bold;
@@ -147,6 +157,14 @@ body {
   gap: 12px;
   flex-shrink: 0;
 }
+
+#elem-count {
+  font-size: 12px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+#elem-count:empty { display: none; }
 
 #status {
   flex: 1;

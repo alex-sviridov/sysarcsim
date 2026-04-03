@@ -63,6 +63,7 @@ function makeDocumentStub() {
   const nodes = {
     'desk':           makeNode('canvas'),
     'status':         makeNode(),
+    'elem-count':     makeNode(),
     'win-badge':      makeNode(),
     'btn-next-level': makeNode(),
     'sidebar':        makeNode(),

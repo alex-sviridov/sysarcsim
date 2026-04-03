@@ -68,6 +68,7 @@ function makeDocumentStub() {
   const nodes = {
     'desk':           makeNode('canvas'),
     'status':         makeNode(),
+    'elem-count':     makeNode(),
     'win-badge':      makeNode(),
     'btn-next-level': makeNode(),
     'sidebar':        makeNode(),
@@ -400,6 +401,54 @@ describe('manual element placement and deletion', () => {
   });
 });
 
+// ── Elements limit ────────────────────────────────────────────────────────
+
+describe('elements limit', () => {
+  function gameWithLimit(limit) {
+    GameElement.resetCounter();
+    ConnectionManager.resetCounter();
+    resetFakeDoc();
+    fakeDoc._nodes['elem-count'].textContent = '';
+    const game = new Game();
+    LEVELS[0]._origLimit = LEVELS[0].elementsLimit;
+    LEVELS[0].elementsLimit = limit;
+    game.levelIndex = 0;
+    game.reset();
+    return game;
+  }
+
+  afterEach(() => {
+    if (LEVELS[0]._origLimit !== undefined) {
+      LEVELS[0].elementsLimit = LEVELS[0]._origLimit;
+      delete LEVELS[0]._origLimit;
+    }
+  });
+
+  test('elem-count shows 0/limit after reset when limited', () => {
+    gameWithLimit(3);
+    expect(fakeDoc._nodes['elem-count'].textContent).toMatch(/0\/3/);
+  });
+
+  test('elem-count shows count after reset when unlimited', () => {
+    gameWithLimit(0);
+    expect(fakeDoc._nodes['elem-count'].textContent).toMatch(/0 element/);
+  });
+
+  test('element count display updates after reset to 0/limit', () => {
+    const game = gameWithLimit(5);
+    const el = new GameElement('Storage', 100, 100, ELEM_DEFS.Storage);
+    game.elements.push(el);
+    game.elemMap.set(el.id, el);
+    game.reset();
+    expect(fakeDoc._nodes['elem-count'].textContent).toMatch(/0\/5/);
+  });
+
+  test('elem-count shows "0 elements" (plural) when unlimited and count is 0', () => {
+    gameWithLimit(0);
+    expect(fakeDoc._nodes['elem-count'].textContent).toBe('0 elements');
+  });
+});
+
 // ── Level data integrity ──────────────────────────────────────────────────
 
 describe('LEVELS data used by Game', () => {
@@ -436,6 +485,14 @@ describe('LEVELS data used by Game', () => {
       for (const type of level.available) {
         expect(ELEM_DEFS).toHaveProperty(type);
       }
+    }
+  });
+
+  test('elementsLimit is a non-negative integer for every level', () => {
+    for (const level of LEVELS) {
+      expect(typeof level.elementsLimit).toBe('number');
+      expect(Number.isInteger(level.elementsLimit)).toBe(true);
+      expect(level.elementsLimit).toBeGreaterThanOrEqual(0);
     }
   });
 });

@@ -35,7 +35,15 @@ function makeNode(tagName = 'div') {
       add(c)      { this._classes.add(c); },
       remove(c)   { this._classes.delete(c); },
       contains(c) { return this._classes.has(c); },
-      toggle(c)   { if (this._classes.has(c)) this._classes.delete(c); else this._classes.add(c); },
+      toggle(c, force) {
+        if (force === undefined) {
+          if (this._classes.has(c)) this._classes.delete(c); else this._classes.add(c);
+        } else if (force) {
+          this._classes.add(c);
+        } else {
+          this._classes.delete(c);
+        }
+      },
     },
     addEventListener(ev, fn) {
       if (!listeners[ev]) listeners[ev] = [];
@@ -290,28 +298,23 @@ describe('Sidebar.clearPending()', () => {
   });
 });
 
+function makeCardEvent(card) {
+  // Simulate a mousedown event whose target is a leaf inside the card.
+  // We need .closest('.card[data-type]') to return the card itself.
+  const target = makeNode('div');
+  target._parent = card;
+  target.closest = (sel) => {
+    let cur = target;
+    while (cur) {
+      if (matchesSel(cur, sel)) return cur;
+      cur = cur._parent ?? null;
+    }
+    return null;
+  };
+  return { target, preventDefault: jest.fn() };
+}
+
 describe('Sidebar card click interactions', () => {
-  function makeCardEvent(card) {
-    // Simulate a mousedown event whose target is a leaf inside the card.
-    // We need .closest('.card[data-type]') to return the card itself.
-    const target = makeNode('div');
-    target._parent = card;
-    target.closest = (sel) => {
-      // Walk up
-      let cur = target;
-      while (cur) {
-        if (matchesSel(cur, sel)) return cur;
-        cur = cur._parent ?? null;
-      }
-      return null;
-    };
-
-    return {
-      target,
-      preventDefault: jest.fn(),
-    };
-  }
-
   test('clicking card emits PENDING_CHANGED with { type, ghostElem } where ghostElem is not null', () => {
     const { sidebar, bus, nodes } = freshSetup();
     sidebar.build(level1());
@@ -378,6 +381,99 @@ describe('Sidebar card click interactions', () => {
 
     const found = fn.mock.calls.some(([d]) => d.type === null);
     expect(found).toBe(true);
+  });
+});
+
+describe('Sidebar elements limit (LIMIT_CHANGED)', () => {
+  function level() {
+    return { title: 'Test', demands: [], available: ['WebServer', 'Database'] };
+  }
+
+  test('LIMIT_CHANGED with count < limit does not disable cards', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 2, limit: 5 });
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      expect(card.classList.contains('card--disabled')).toBe(false);
+    }
+  });
+
+  test('LIMIT_CHANGED with count === limit disables all cards', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 5, limit: 5 });
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    expect(cards.length).toBeGreaterThan(0);
+    for (const card of cards) {
+      expect(card.classList.contains('card--disabled')).toBe(true);
+    }
+  });
+
+  test('LIMIT_CHANGED with limit 0 (unlimited) never disables cards', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 999, limit: 0 });
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      expect(card.classList.contains('card--disabled')).toBe(false);
+    }
+  });
+
+  test('cards re-enable when count drops below limit', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 3, limit: 3 });
+    bus.emit(Events.LIMIT_CHANGED, { count: 2, limit: 3 });
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      expect(card.classList.contains('card--disabled')).toBe(false);
+    }
+  });
+
+  test('clicking a disabled card emits SET_STATUS with limit message', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 3, limit: 3 });
+
+    const fn = jest.fn();
+    bus.on(Events.SET_STATUS, fn);
+
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const event = makeCardEvent(cards[0]);
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn.mock.calls[0][0].msg).toMatch(/limit/i);
+  });
+
+  test('clicking a disabled card does NOT emit PENDING_CHANGED or SIDEBAR_DRAG_START', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 3, limit: 3 });
+
+    const pendingFn = jest.fn();
+    const dragFn    = jest.fn();
+    bus.on(Events.PENDING_CHANGED, pendingFn);
+    bus.on(Events.SIDEBAR_DRAG_START, dragFn);
+
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const event = makeCardEvent(cards[0]);
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    expect(pendingFn).not.toHaveBeenCalled();
+    expect(dragFn).not.toHaveBeenCalled();
+  });
+
+  test('build() resets disabled state', () => {
+    const { bus, sidebar, nodes } = freshSetup();
+    sidebar.build(level());
+    bus.emit(Events.LIMIT_CHANGED, { count: 3, limit: 3 });
+    sidebar.build(level());
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    for (const card of cards) {
+      expect(card.classList.contains('card--disabled')).toBe(false);
+    }
   });
 });
 

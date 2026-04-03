@@ -5,6 +5,7 @@
 export const LEVELS = [
   {
     title: 'Level 1 — Web Service',
+    elementsLimit: 0,
     demands: [
       {
         type:    'WebUser',
@@ -19,6 +20,7 @@ export const LEVELS = [
   },
   {
     title: 'Level 2 — Web & Mobile',
+    elementsLimit: 0,
     demands: [
       {
         type:    'WebUser',

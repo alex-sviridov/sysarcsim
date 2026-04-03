@@ -5,16 +5,24 @@ import { Events } from './event-bus.js';
 
 export class Sidebar {
   #bus;
-  #pendingType = null;
-  #ghostElem   = null;
+  #pendingType  = null;
+  #ghostElem    = null;
+  #limitReached = false;
 
   constructor(bus) {
     this.#bus = bus;
+    bus.on(Events.LIMIT_CHANGED, ({ count, limit }) => {
+      this.#limitReached = limit > 0 && count >= limit;
+      document.querySelectorAll('#sidebar-cards .card[data-type]').forEach(card => {
+        card.classList.toggle('card--disabled', this.#limitReached);
+      });
+    });
     this.#bindButtons();
   }
 
   build(level) {
     this.clearPending();
+    this.#limitReached = false;
 
     const titleEl   = document.getElementById('level-title');
     const container = document.getElementById('sidebar-cards');
@@ -74,6 +82,12 @@ export class Sidebar {
       const card = e.target.closest('.card[data-type]');
       if (!card) return;
       e.preventDefault();
+
+      if (card.classList.contains('card--disabled')) {
+        this.#bus.emit(Events.SET_STATUS, { msg: 'Element limit reached.', duration: 2000 });
+        return;
+      }
+
       const type = card.dataset.type;
       if (this.#pendingType === type) {
         this.clearPending();

@@ -11,6 +11,7 @@ export const Events = {
   GAME_RESET:      'game:reset',       // {}
   CHECK_WIN:       'game:check-win',   // {}
   SET_STATUS:      'game:set-status',  // { msg, duration? }
+  LIMIT_CHANGED:   'game:limit-changed', // { count, limit }
 };
 
 export class EventBus {
