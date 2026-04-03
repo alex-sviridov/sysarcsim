@@ -163,7 +163,9 @@ export class InputHandler {
     // Empty space — place pending element or start pan
     if (this.#pendingType) {
       this.#bus.emit(Events.ELEMENT_PLACE, { x, y, type: this.#pendingType });
-      this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
+      if (!e.shiftKey) {
+        this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
+      }
     } else {
       this.selectedEl = null;
       this.#bus.emit(Events.CONN_SELECT, { conn: null });
@@ -256,7 +258,9 @@ export class InputHandler {
       const hitsElem = this.#elements.some(el => el.hitBody(x, y));
       if (this.#pendingType && onCanvas && !hitsElem) {
         this.#bus.emit(Events.ELEMENT_PLACE, { x, y, type: this.#pendingType });
-        this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
+        if (!e.shiftKey) {
+          this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
+        }
       } else if (!onCanvas && this.#sidebarDragMoved) {
         this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
       }

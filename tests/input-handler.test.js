@@ -122,8 +122,8 @@ function makeMockEl(x = 100, y = 100, def = null) {
 /** Simulate a mouse event with clientX/clientY. Canvas rect is {left:0, top:0}
  *  so clientX/clientY === canvas coords directly.
  */
-function mouseEvent(x, y, button = 0) {
-  return { clientX: x, clientY: y, button, preventDefault: jest.fn() };
+function mouseEvent(x, y, button = 0, shiftKey = false) {
+  return { clientX: x, clientY: y, button, shiftKey, preventDefault: jest.fn() };
 }
 
 // ── getRenderState ─────────────────────────────────────────────────────────────
@@ -944,5 +944,115 @@ describe('keydown Escape', () => {
 
     fireDoc('keydown', { key: 'Enter' });
     expect(handler.state).toBeNull();
+  });
+});
+
+// ── shift-place: click-click mode ─────────────────────────────────────────────
+
+describe('shift-place - click on empty canvas', () => {
+  test('emits ELEMENT_PLACE as normal', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+
+    fireCanvas('mousedown', mouseEvent(400, 300, 0, true));
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn.mock.calls[0][0]).toMatchObject({ x: 400, y: 300, type: 'WebServer' });
+  });
+
+  test('does NOT emit PENDING_CHANGED(null) when shift is held', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    const fn = jest.fn();
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    fireCanvas('mousedown', mouseEvent(400, 300, 0, true));
+
+    const cleared = fn.mock.calls.some(([d]) => d.type === null);
+    expect(cleared).toBe(false);
+  });
+
+  test('pendingType remains set after shift-place', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    fireCanvas('mousedown', mouseEvent(400, 300, 0, true));
+
+    expect(handler.getRenderState().ghostElem).not.toBeNull();
+  });
+
+  test('without shift: emits PENDING_CHANGED(null) as before', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    const fn = jest.fn();
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    fireCanvas('mousedown', mouseEvent(400, 300, 0, false));
+
+    const cleared = fn.mock.calls.some(([d]) => d.type === null);
+    expect(cleared).toBe(true);
+  });
+});
+
+// ── shift-place: sidebar drag release ────────────────────────────────────────
+
+describe('shift-place - sidebar drag release on canvas', () => {
+  test('emits ELEMENT_PLACE as normal', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.emit(Events.SIDEBAR_DRAG_START, {});
+
+    fireDoc('mouseup', mouseEvent(400, 300, 0, true));
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn.mock.calls[0][0]).toMatchObject({ x: 400, y: 300, type: 'WebServer' });
+  });
+
+  test('does NOT emit PENDING_CHANGED(null) when shift is held', () => {
+    const { handler, bus } = makeSetup();
+    const fn = jest.fn();
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.emit(Events.SIDEBAR_DRAG_START, {});
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    fireDoc('mouseup', mouseEvent(400, 300, 0, true));
+
+    const cleared = fn.mock.calls.some(([d]) => d.type === null);
+    expect(cleared).toBe(false);
+  });
+
+  test('ghostElem remains after shift sidebar drag-place', () => {
+    const { handler, bus } = makeSetup();
+    const ghost = { x: 0, y: 0, w: 200, h: 58 };
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: ghost });
+    bus.emit(Events.SIDEBAR_DRAG_START, {});
+
+    fireDoc('mouseup', mouseEvent(400, 300, 0, true));
+
+    expect(handler.getRenderState().ghostElem).toBe(ghost);
+  });
+
+  test('without shift: emits PENDING_CHANGED(null) as before', () => {
+    const { handler, bus } = makeSetup();
+    const fn = jest.fn();
+
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.emit(Events.SIDEBAR_DRAG_START, {});
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    fireDoc('mouseup', mouseEvent(400, 300, 0, false));
+
+    const cleared = fn.mock.calls.some(([d]) => d.type === null);
+    expect(cleared).toBe(true);
   });
 });

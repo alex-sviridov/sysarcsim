@@ -153,7 +153,11 @@ export class InputHandler {
     // Empty space — place pending element (click-click mode) or deselect
     if (this._pendingType) {
       game._placeElement(x, y, this._pendingType);
-      this._clearPending();
+      if (e.shiftKey) {
+        this._ghostElem = new GameElement(this._pendingType, 0, 0, ELEM_DEFS[this._pendingType]);
+      } else {
+        this._clearPending();
+      }
     } else {
       this.selectedEl           = null;
       game.connMgr.selectedConn = null;
@@ -231,7 +235,11 @@ export class InputHandler {
       const hitsElem = game.elements.some(el => el.hitBody(x, y));
       if (this._pendingType && onCanvas && !hitsElem) {
         game._placeElement(x, y, this._pendingType);
-        this._clearPending();
+        if (e.shiftKey) {
+          this._ghostElem = new GameElement(this._pendingType, 0, 0, ELEM_DEFS[this._pendingType]);
+        } else {
+          this._clearPending();
+        }
       } else if (!onCanvas && this._sidebarDragMoved) {
         this._clearPending(); // dragged back to sidebar intentionally
       }
