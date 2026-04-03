@@ -69,6 +69,9 @@ function makeDocumentStub() {
     'sidebar-cards':  makeNode(),
     'btn-reset':      makeNode(),
     'level-title':    makeNode(),
+    'btn-zoom-in':    makeNode(),
+    'btn-zoom-out':   makeNode(),
+    'btn-center':     makeNode(),
   };
   return {
     _nodes: nodes,

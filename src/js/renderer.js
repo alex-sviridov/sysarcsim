@@ -27,33 +27,53 @@ export class Renderer {
     const H = this.#cssH;
     if (!W || !H) return;
 
+    const cam = game.camera;
     const { state, selectedEl, ghostElem, mx, my } = game.input.getRenderState();
     const result = game.connMgr.computeActivePct(game.elements);
 
-    this.#drawGrid(W, H);
+    this.#drawGrid(W, H, cam);
+
+    // ── World-space drawing (camera-transformed) ───────────────────────────
+    const ctx = this.#ctx;
+    ctx.save();
+    ctx.translate(cam.x, cam.y);
+    ctx.scale(cam.zoom, cam.zoom);
+
     this.#drawConnections(game.connMgr.connections, result, game.elemMap, now);
     this.#drawWireInProgress(state);
     this.#drawElements(game.elements, game.connMgr.connections, result, now);
     this.#drawSnapIndicator(state);
-    this.#drawSelectionOutline(selectedEl);
     this.#drawGhost(ghostElem, mx, my);
 
+    ctx.restore();
+    // ── Screen-space overlays (not affected by camera) ─────────────────────
+
+    this.#drawSelectionOutline(selectedEl, cam);
+
     if (game.connMgr.selectedConn) {
-      const m = game.connMgr.mid(game.connMgr.selectedConn);
-      this.#drawRemoveIcon(m.x, m.y);
+      const m  = game.connMgr.mid(game.connMgr.selectedConn);
+      const ms = cam.toScreen(m.x, m.y);
+      this.#drawRemoveIcon(ms.x, ms.y);
     }
     if (selectedEl && !selectedEl.def.preset) {
-      this.#drawRemoveIcon(selectedEl.x + selectedEl.w, selectedEl.y);
+      const rs = cam.toScreen(selectedEl.x + selectedEl.w, selectedEl.y);
+      this.#drawRemoveIcon(rs.x, rs.y);
     }
   }
 
-  #drawGrid(W, H) {
-    const ctx = this.#ctx;
+  #drawGrid(W, H, cam) {
+    const ctx  = this.#ctx;
     ctx.fillStyle = '#0d1117';
     ctx.fillRect(0, 0, W, H);
+
+    const step   = GRID_SIZE * cam.zoom;
+    // offset so dots stay aligned with the world grid as camera pans/zooms
+    const offsetX = ((cam.x % step) + step) % step;
+    const offsetY = ((cam.y % step) + step) % step;
+
     ctx.fillStyle = '#1c2128';
-    for (let gx = GRID_SIZE; gx < W; gx += GRID_SIZE) {
-      for (let gy = GRID_SIZE; gy < H; gy += GRID_SIZE) {
+    for (let gx = offsetX; gx < W; gx += step) {
+      for (let gy = offsetY; gy < H; gy += step) {
         ctx.fillRect(gx - 1, gy - 1, 2, 2);
       }
     }
@@ -209,15 +229,20 @@ export class Renderer {
     ctx.restore();
   }
 
-  #drawSelectionOutline(selectedEl) {
+  #drawSelectionOutline(selectedEl, cam) {
     if (!selectedEl) return;
     const ctx = this.#ctx;
-    const el = selectedEl;
+    const el  = selectedEl;
+    // Convert world corners to screen space
+    const tl = cam.toScreen(el.x - 4,         el.y - 4);
+    const br = cam.toScreen(el.x + el.w + 4,  el.y + el.h + 4);
+    const w  = br.x - tl.x;
+    const h  = br.y - tl.y;
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
-    ctx.roundRect(el.x - 4, el.y - 4, el.w + 8, el.h + 8, 10);
+    ctx.roundRect(tl.x, tl.y, w, h, 10);
     ctx.stroke();
     ctx.setLineDash([]);
   }

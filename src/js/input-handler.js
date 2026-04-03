@@ -6,12 +6,14 @@ export class InputHandler {
   //   null
   //   { mode: 'drag', elem, dx, dy }
   //   { mode: 'wire', fromElem, fromPort, mx, my, ox, oy, moved, snap }
+  //   { mode: 'pan',  sx, sy, camX, camY }
   state      = null;
   selectedEl = null;
 
   #bus;
   #elements;   // reference to game.elements array
   #connMgr;    // reference to game.connMgr
+  #cam;        // reference to game.camera (Camera instance)
 
   #dragStartEl      = null;
   #dragStartPos     = null;
@@ -23,14 +25,15 @@ export class InputHandler {
   #sidebarDragging  = false;
   #sidebarDragMoved = false;
 
-  #mx = 0;
-  #my = 0;
+  #mx = 0;  // world-space mouse X (for rendering)
+  #my = 0;  // world-space mouse Y (for rendering)
 
-  constructor(canvas, bus, elements, connMgr) {
-    this.canvas   = canvas;
-    this.#bus     = bus;
+  constructor(canvas, bus, elements, connMgr, camera) {
+    this.canvas    = canvas;
+    this.#bus      = bus;
     this.#elements = elements;
     this.#connMgr  = connMgr;
+    this.#cam      = camera;
 
     bus.on(Events.PENDING_CHANGED, ({ type, ghostElem }) => {
       this.#pendingType = type;
@@ -60,9 +63,17 @@ export class InputHandler {
     };
   }
 
+  /**
+   * Returns both world-space {x, y} and raw screen-space {sx, sy}.
+   * World coords are used for element/port/wire hit tests.
+   * Screen coords are used for remove-icon hit tests (drawn in screen space).
+   */
   #xy(e) {
-    const r = this.canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    const r  = this.canvas.getBoundingClientRect();
+    const sx = e.clientX - r.left;
+    const sy = e.clientY - r.top;
+    const w  = this.#cam.toWorld(sx, sy);
+    return { x: w.x, y: w.y, sx, sy };
   }
 
   #bindEvents() {
@@ -70,6 +81,7 @@ export class InputHandler {
     document.addEventListener('mousemove',      e => this.#onMove(e));
     document.addEventListener('mouseup',        e => this.#onUp(e));
     this.canvas.addEventListener('contextmenu', e => { e.preventDefault(); this.#onRightClick(e); });
+    this.canvas.addEventListener('wheel',       e => this.#onWheel(e), { passive: false });
 
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
@@ -81,22 +93,22 @@ export class InputHandler {
 
   #onDown(e) {
     if (e.button !== 0) return;
-    const { x, y } = this.#xy(e);
+    const { x, y, sx, sy } = this.#xy(e);
 
-    // Remove icon on selected connection
+    // Remove icon on selected connection (screen-space hit)
     if (this.#connMgr.selectedConn) {
-      const m = this.#connMgr.mid(this.#connMgr.selectedConn);
-      if (Math.hypot(x - m.x, y - m.y) < REMOVE_HIT_R) {
+      const m  = this.#connMgr.mid(this.#connMgr.selectedConn);
+      const ms = this.#cam.toScreen(m.x, m.y);
+      if (Math.hypot(sx - ms.x, sy - ms.y) < REMOVE_HIT_R) {
         this.#bus.emit(Events.CONN_DELETE, { conn: this.#connMgr.selectedConn });
         return;
       }
     }
 
-    // Remove icon on selected non-preset element
+    // Remove icon on selected non-preset element (screen-space hit)
     if (this.selectedEl && !this.selectedEl.def.preset) {
-      const rx = this.selectedEl.x + this.selectedEl.w;
-      const ry = this.selectedEl.y;
-      if (Math.hypot(x - rx, y - ry) < REMOVE_HIT_R) {
+      const rs = this.#cam.toScreen(this.selectedEl.x + this.selectedEl.w, this.selectedEl.y);
+      if (Math.hypot(sx - rs.x, sy - rs.y) < REMOVE_HIT_R) {
         this.#bus.emit(Events.ELEMENT_DELETE, { el: this.selectedEl });
         this.selectedEl = null;
         return;
@@ -148,13 +160,14 @@ export class InputHandler {
       }
     }
 
-    // Empty space — place pending element (click-click mode) or deselect
+    // Empty space — place pending element or start pan
     if (this.#pendingType) {
       this.#bus.emit(Events.ELEMENT_PLACE, { x, y, type: this.#pendingType });
       this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
     } else {
       this.selectedEl = null;
       this.#bus.emit(Events.CONN_SELECT, { conn: null });
+      this.state = { mode: 'pan', sx, sy, camX: this.#cam.x, camY: this.#cam.y };
     }
   }
 
@@ -176,14 +189,26 @@ export class InputHandler {
   }
 
   #onMove(e) {
-    const { x, y } = this.#xy(e);
+    const r  = this.canvas.getBoundingClientRect();
+    const sx = e.clientX - r.left;
+    const sy = e.clientY - r.top;
+    const { x, y } = this.#cam.toWorld(sx, sy);
 
-    if (this.#sidebarDragging && Math.hypot(x - this.#mx, y - this.#my) > 4) {
+    if (this.#sidebarDragging && Math.hypot(sx - this.#cam.toScreen(this.#mx, this.#my).x,
+                                             sy - this.#cam.toScreen(this.#mx, this.#my).y) > 4) {
       this.#sidebarDragMoved = true;
     }
 
     this.#mx = x;
     this.#my = y;
+
+    if (this.state?.mode === 'pan') {
+      this.#cam.x = this.state.camX + (sx - this.state.sx);
+      this.#cam.y = this.state.camY + (sy - this.state.sy);
+      this.#cam.clamp(this.#elements, r.width, r.height);
+      this.canvas.style.cursor = 'grabbing';
+      return;
+    }
 
     if (this.state?.mode === 'drag') {
       this.state.elem.x = x - this.state.dx;
@@ -219,7 +244,7 @@ export class InputHandler {
 
   #onUp(e) {
     if (e.button !== 0) { this.state = null; return; }
-    const { x, y } = this.#xy(e);
+    const { x, y, sx, sy } = this.#xy(e);
 
     // Sidebar drag release — place if over empty canvas, else keep pending for click-click
     if (this.#sidebarDragging) {
@@ -227,7 +252,7 @@ export class InputHandler {
       const r        = this.canvas.getBoundingClientRect();
       const cssW     = r.width;
       const cssH     = r.height;
-      const onCanvas = x >= 0 && x <= cssW && y >= 0 && y <= cssH;
+      const onCanvas = sx >= 0 && sx <= cssW && sy >= 0 && sy <= cssH;
       const hitsElem = this.#elements.some(el => el.hitBody(x, y));
       if (this.#pendingType && onCanvas && !hitsElem) {
         this.#bus.emit(Events.ELEMENT_PLACE, { x, y, type: this.#pendingType });
@@ -236,6 +261,11 @@ export class InputHandler {
         this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
       }
       // quick click (no movement) → keep pendingType for click-click mode
+      return;
+    }
+
+    if (this.state?.mode === 'pan') {
+      this.state = null;
       return;
     }
 
@@ -267,5 +297,15 @@ export class InputHandler {
         return;
       }
     }
+  }
+
+  #onWheel(e) {
+    e.preventDefault();
+    const r      = this.canvas.getBoundingClientRect();
+    const sx     = e.clientX - r.left;
+    const sy     = e.clientY - r.top;
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    this.#cam.zoomAt(sx, sy, factor);
+    this.#cam.clamp(this.#elements, r.width, r.height);
   }
 }

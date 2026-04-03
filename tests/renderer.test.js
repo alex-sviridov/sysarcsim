@@ -68,6 +68,15 @@ function makeCanvas() {
 
 // ── Mock game factory ─────────────────────────────────────────────────────────
 
+// Identity camera stub: zoom=1, x=0, y=0 — screen coords === world coords
+function makeIdentityCamera() {
+  return {
+    x: 0, y: 0, zoom: 1,
+    toWorld(sx, sy) { return { x: sx, y: sy }; },
+    toScreen(wx, wy) { return { x: wx, y: wy }; },
+  };
+}
+
 function makeMockGame({
   state      = null,
   selectedEl = null,
@@ -79,8 +88,10 @@ function makeMockGame({
   elements    = [],
   elemMap     = new Map(),
   computeActivePct = null,
+  camera      = null,
 } = {}) {
   return {
+    camera: camera ?? makeIdentityCamera(),
     input: {
       getRenderState: jest.fn(() => ({ state, selectedEl, ghostElem, mx, my })),
     },

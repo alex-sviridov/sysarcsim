@@ -74,7 +74,16 @@ function makeSetup() {
     delete: jest.fn(),
   };
 
-  const handler = new InputHandler(canvas, bus, elements, connMgr);
+  // Identity camera: zoom=1, x=0, y=0 — screen coords === world coords
+  const camera = {
+    x: 0, y: 0, zoom: 1,
+    toWorld(sx, sy) { return { x: sx, y: sy }; },
+    toScreen(wx, wy) { return { x: wx, y: wy }; },
+    zoomAt() {},
+    clamp() {},
+  };
+
+  const handler = new InputHandler(canvas, bus, elements, connMgr, camera);
 
   return { canvas, bus, elements, connMgr, handler, fireCanvas };
 }

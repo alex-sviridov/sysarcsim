@@ -11,6 +11,9 @@ export const REMOVE_HIT_R      = 12;  // hit-test radius for remove icons
 export const SNAP_INDICATOR_R  = 11;  // radius of the snap ring drawn near target port
 export const BEZIER_SAMPLES    = 24;  // sample count for bezier hit-testing
 
+export const ZOOM_MIN = 0.5;
+export const ZOOM_MAX = 1.5;
+
 export const PORT_COLOR = {
   WebSite:   '#79c0ff',
   SQL:       '#56d364',

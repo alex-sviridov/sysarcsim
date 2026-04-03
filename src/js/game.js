@@ -6,10 +6,12 @@ import { Renderer } from './renderer.js';
 import { InputHandler } from './input-handler.js';
 import { Sidebar } from './sidebar.js';
 import { EventBus, Events } from './event-bus.js';
+import { Camera } from './camera.js';
 
 export class Game {
-  // Public refs read by Renderer
+  // Public refs read by Renderer / InputHandler
   canvas;
+  camera    = new Camera();
   elements  = [];
   elemMap   = new Map(); // id → GameElement
   connMgr;
@@ -41,10 +43,11 @@ export class Game {
 
     this.#setupCanvas();
 
-    this.input = new InputHandler(this.canvas, this.#bus, this.elements, this.connMgr);
+    this.input = new InputHandler(this.canvas, this.#bus, this.elements, this.connMgr, this.camera);
 
     this.#boundLoop = () => this.#loop();
 
+    this.#setupViewportButtons();
     this.#subscribeEvents();
     this.#sidebar.build(LEVELS[this.levelIndex]);
     this.reset();
@@ -66,6 +69,27 @@ export class Game {
     };
     window.addEventListener('resize', resize);
     resize();
+  }
+
+  // ── Viewport control buttons ──────────────────────────────────────────────
+
+  #setupViewportButtons() {
+    const ZOOM_FACTOR = 1.2;
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      this.camera.zoomAt(this.#cssW / 2, this.#cssH / 2, ZOOM_FACTOR);
+      this.camera.clamp(this.elements, this.#cssW, this.#cssH);
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      this.camera.zoomAt(this.#cssW / 2, this.#cssH / 2, 1 / ZOOM_FACTOR);
+      this.camera.clamp(this.elements, this.#cssW, this.#cssH);
+    });
+
+    document.getElementById('btn-center').addEventListener('click', () => {
+      this.camera.centerOn(this.elements, this.#cssW, this.#cssH);
+      this.camera.clamp(this.elements, this.#cssW, this.#cssH);
+    });
   }
 
   // ── Event subscriptions ───────────────────────────────────────────────────
@@ -132,6 +156,11 @@ export class Game {
       this.elements.push(el);
       this.elemMap.set(el.id, el);
     }
+
+    // Reset camera to identity so elements are visible without transform
+    this.camera.x    = 0;
+    this.camera.y    = 0;
+    this.camera.zoom = 1;
 
     this.#setStatus('Connect elements to satisfy the demand.');
   }

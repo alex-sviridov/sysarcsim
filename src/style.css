@@ -19,6 +19,40 @@ body {
   display: flex;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+}
+
+#viewport-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 212px; /* sidebar is 200px + 1px border + some gap */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 10;
+}
+
+#viewport-controls button {
+  width: 32px;
+  height: 32px;
+  background: #21262d;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  padding: 0;
+}
+
+#viewport-controls button:hover {
+  background: #30363d;
+  border-color: #58a6ff;
 }
 
 #desk {
