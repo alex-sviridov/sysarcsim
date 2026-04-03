@@ -177,3 +177,46 @@ describe('Available types cross-reference ELEM_DEFS', () => {
     }
   });
 });
+
+describe('Demand port spec structure', () => {
+  test('every port spec in demand inputs is an object, not a primitive', () => {
+    for (const level of LEVELS) {
+      for (const demand of level.demands) {
+        for (const [portName, spec] of Object.entries(demand.inputs)) {
+          expect(typeof spec).toBe('object');
+          expect(spec).not.toBeNull();
+        }
+      }
+    }
+  });
+
+  test('"multipath" is never a top-level key of demand.inputs (must be nested in port spec)', () => {
+    for (const level of LEVELS) {
+      for (const demand of level.demands) {
+        expect(Object.keys(demand.inputs)).not.toContain('multipath');
+      }
+    }
+  });
+
+  test('every port spec in demand inputs has a numeric demand property', () => {
+    for (const level of LEVELS) {
+      for (const demand of level.demands) {
+        for (const spec of Object.values(demand.inputs)) {
+          expect(typeof spec.demand).toBe('number');
+        }
+      }
+    }
+  });
+});
+
+describe('Level 2 WebUser multipath', () => {
+  test('WebUser WebSite input has multipath:true nested inside the port spec', () => {
+    const webUser = LEVELS[1].demands.find(d => d.type === 'WebUser');
+    expect(webUser.inputs.WebSite.multipath).toBe(true);
+  });
+
+  test('WebUser inputs has exactly one port key (WebSite)', () => {
+    const webUser = LEVELS[1].demands.find(d => d.type === 'WebUser');
+    expect(Object.keys(webUser.inputs)).toEqual(['WebSite']);
+  });
+});

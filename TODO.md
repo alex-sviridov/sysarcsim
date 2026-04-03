@@ -1,5 +1,4 @@
 - animation on type mismatch (create red cconnection, blink, remove it)
-- zoom in/out with mouse and buttons, movable board with center button
 - multiadd when shift is pressed
 - when not full production power is possible, limit the largest based on the minimal
 - add measurement units

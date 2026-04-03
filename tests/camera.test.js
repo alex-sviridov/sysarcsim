@@ -99,14 +99,14 @@ describe('Camera.zoomAt()', () => {
   test('zoom increases when factor > 1', () => {
     const cam = new Camera();
     cam.zoomAt(0, 0, 2);
-    expect(cam.zoom).toBeCloseTo(2);
+    expect(cam.zoom).toBeCloseTo(Math.min(ZOOM_MAX, 1 * 2));
   });
 
   test('zoom decreases when factor < 1', () => {
     const cam = new Camera();
-    cam.zoom = 2;
+    cam.zoom = ZOOM_MAX;
     cam.zoomAt(0, 0, 0.5);
-    expect(cam.zoom).toBeCloseTo(1);
+    expect(cam.zoom).toBeCloseTo(Math.max(ZOOM_MIN, ZOOM_MAX * 0.5));
   });
 
   test('zoom is clamped at ZOOM_MIN', () => {
@@ -135,7 +135,7 @@ describe('Camera.zoomAt()', () => {
 
   test('world point under anchor stays fixed after zoom-out', () => {
     const cam = new Camera();
-    cam.zoom = 2; cam.x = -200; cam.y = -100;
+    cam.zoom = ZOOM_MAX; cam.x = -200; cam.y = -100;
     const sx = 300, sy = 200;
     const worldBefore = cam.toWorld(sx, sy);
     cam.zoomAt(sx, sy, 0.5);
@@ -148,9 +148,10 @@ describe('Camera.zoomAt()', () => {
     const cam = new Camera();
     cam.zoom = 1; cam.x = 100; cam.y = 50;
     cam.zoomAt(0, 0, 2);
-    expect(cam.zoom).toBeCloseTo(2);
-    expect(cam.x).toBeCloseTo(200);
-    expect(cam.y).toBeCloseTo(100);
+    const expectedZoom = Math.min(ZOOM_MAX, 1 * 2);
+    expect(cam.zoom).toBeCloseTo(expectedZoom);
+    expect(cam.x).toBeCloseTo(100 * expectedZoom);
+    expect(cam.y).toBeCloseTo(50 * expectedZoom);
   });
 });
 

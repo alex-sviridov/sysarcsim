@@ -23,7 +23,7 @@ export const LEVELS = [
       {
         type:    'WebUser',
         label:   'Web User',
-        inputs:  { WebSite: { demand: 100 }, multipath: true   },
+        inputs:  { WebSite: { demand: 100, multipath: true } },
         outputs: {},
         color:   '#c93c37',
         preset:  true,

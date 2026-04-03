@@ -368,6 +368,71 @@ describe('ConnectionManager.computeActivePct', () => {
   });
 });
 
+// ── level demand multipath ────────────────────────────────────────────────────
+
+describe('ConnectionManager.tryConnect with level demand defs', () => {
+  function makeDemandDef(portType, demand, multipath) {
+    const portSpec = multipath !== undefined ? { demand, multipath } : { demand };
+    return { inputs: { [portType]: portSpec }, outputs: {}, preset: true };
+  }
+
+  test('demand input with multipath:true allows multiple incoming connections', () => {
+    const { mgr, mkElem, elemMap } = makeSetup();
+    // Two WebServers both connecting to a WebUser demand (multipath:true input)
+    const ws1 = mkElem('WebServer');
+    const ws2 = mkElem('WebServer');
+    const demandDef = makeDemandDef('WebSite', 100, true);
+    const demand = new GameElement('WebUser', 0, 0, demandDef);
+    elemMap.set(demand.id, demand);
+
+    mgr.tryConnect(ws1, 0, demand, 0);
+    mgr.tryConnect(ws2, 0, demand, 0);
+    expect(mgr.connections).toHaveLength(2);
+  });
+
+  test('demand input without multipath:true displaces existing incoming connection', () => {
+    const { mgr, mkElem, elemMap } = makeSetup();
+    const ws1 = mkElem('WebServer');
+    const ws2 = mkElem('WebServer');
+    const demandDef = makeDemandDef('WebSite', 100);  // no multipath
+    const demand = new GameElement('WebUser', 0, 0, demandDef);
+    elemMap.set(demand.id, demand);
+
+    mgr.tryConnect(ws1, 0, demand, 0);
+    expect(mgr.connections).toHaveLength(1);
+    mgr.tryConnect(ws2, 0, demand, 0);
+    expect(mgr.connections).toHaveLength(1);
+    expect(mgr.connections[0].fromId).toBe(ws2.id);
+  });
+
+  test('demand with multipath:true reaches 100% active when combined supply meets demand', () => {
+    const { mgr, mkElem, elemMap } = makeSetup();
+    // Two WebServers (supply WebSite=100 each) → WebUser demand=100, multipath:true
+    // Each WS needs to be supplied too: give them SQL and Storage
+    const s1 = mkElem('Storage');
+    const s2 = mkElem('Storage');
+    const db = mkElem('Database');
+    const ws1 = mkElem('WebServer');
+
+    // Supply ws1 fully
+    mgr.tryConnect(s1, 0, db, 0);
+    mgr.tryConnect(s2, 0, db, 0);
+    mgr.tryConnect(db, 0, ws1, 0);    // SQL
+    const s3 = mkElem('Storage');
+    elemMap.set(s3.id, s3);
+    mgr.tryConnect(s3, 0, ws1, 1);   // Storage
+
+    const demandDef = makeDemandDef('WebSite', 100, true);
+    const demand = new GameElement('WebUser', 0, 0, demandDef);
+    elemMap.set(demand.id, demand);
+
+    mgr.tryConnect(ws1, 0, demand, 0);
+
+    const { activePct } = mgr.computeActivePct([s1, s2, s3, db, ws1, demand]);
+    expect(activePct.get(demand)).toBe(100);
+  });
+});
+
 // ── mid / hit ─────────────────────────────────────────────────────────────────
 
 describe('ConnectionManager.mid', () => {
