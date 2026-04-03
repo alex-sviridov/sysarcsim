@@ -108,8 +108,8 @@ await import('../src/js/game.js');
 await import('../src/js/main.js');
 
 // ── Helper to fire simulated events ──────────────────────────────────────────
-function fireDOMContentLoaded() {
-  for (const fn of windowListeners['DOMContentLoaded'] ?? []) fn();
+async function fireDOMContentLoaded() {
+  for (const fn of windowListeners['DOMContentLoaded'] ?? []) await fn();
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -131,20 +131,20 @@ describe('main.js bootstrap', () => {
     expect(countBefore).toBe(0);
   });
 
-  test('requestAnimationFrame is called after DOMContentLoaded fires', () => {
+  test('requestAnimationFrame is called after DOMContentLoaded fires', async () => {
     rafCallback = null;
     global.requestAnimationFrame.mockClear();
-    fireDOMContentLoaded();
+    await fireDOMContentLoaded();
     expect(global.requestAnimationFrame).toHaveBeenCalledTimes(1);
   });
 
-  test('Game is NOT constructed before rAF callback runs', () => {
+  test('Game is NOT constructed before rAF callback runs', async () => {
     // After DOMContentLoaded but before rAF callback, Game is not yet new'd.
     // We can verify this by checking that requestAnimationFrame was called
     // but rafCallback (the rAF cb) has not yet been invoked.
     global.requestAnimationFrame.mockClear();
     rafCallback = null;
-    fireDOMContentLoaded();
+    await fireDOMContentLoaded();
     // rAF registered but not yet fired
     expect(rafCallback).not.toBeNull();
     // Game constructor would call renderer.render → requestAnimationFrame again;
@@ -153,19 +153,19 @@ describe('main.js bootstrap', () => {
     expect(global.requestAnimationFrame).toHaveBeenCalledTimes(1);
   });
 
-  test('rAF callback runs without throwing (constructs Game)', () => {
+  test('rAF callback runs without throwing (constructs Game)', async () => {
     global.requestAnimationFrame.mockClear();
     rafCallback = null;
-    fireDOMContentLoaded();
+    await fireDOMContentLoaded();
     expect(() => {
       if (rafCallback) rafCallback(0);
     }).not.toThrow();
   });
 
-  test('after rAF callback, requestAnimationFrame is called again (game loop)', () => {
+  test('after rAF callback, requestAnimationFrame is called again (game loop)', async () => {
     global.requestAnimationFrame.mockClear();
     rafCallback = null;
-    fireDOMContentLoaded();
+    await fireDOMContentLoaded();
     const callsAfterDOMCL = global.requestAnimationFrame.mock.calls.length;
     if (rafCallback) rafCallback(0);
     // Game's render loop schedules another rAF

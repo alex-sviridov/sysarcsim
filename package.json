@@ -10,7 +10,8 @@
   "jest": {
     "extensionsToTreatAsEsm": [],
     "testEnvironment": "node",
-    "transform": {}
+    "transform": {},
+    "setupFilesAfterEnv": ["./tests/setup.js"]
   },
   "repository": {
     "type": "git",
