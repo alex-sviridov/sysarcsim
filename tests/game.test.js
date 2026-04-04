@@ -335,6 +335,84 @@ describe('Game.checkWin()', () => {
   });
 });
 
+// ── checkWin() — requiredLatency ──────────────────────────────────────────
+
+describe('Game.checkWin() with requiredLatency', () => {
+  // Helper: mock computeActivePct to return controlled activePct and latency
+  function mockCompute(game, { activePctVal = 100, latencyVal = 1 } = {}) {
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      const latency   = new Map();
+      for (const el of elements) {
+        activePct.set(el, activePctVal);
+        latency.set(el, latencyVal);
+      }
+      return { activePct, latency, flow: new Map(), received: new Map() };
+    };
+  }
+
+  test('wins when demand has no requiredLatency (latency is irrelevant)', () => {
+    const game = freshGame();
+    mockCompute(game, { activePctVal: 100, latencyVal: 99 });
+    // strip requiredLatency so this tests the "no requirement" case
+    for (const el of game.elements) {
+      const { requiredLatency: _, ...rest } = el.def;
+      el.def = rest;
+    }
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(false);
+  });
+
+  test('wins when latency meets requiredLatency', () => {
+    const game = freshGame();
+    mockCompute(game, { activePctVal: 100, latencyVal: 3 });
+    for (const el of game.elements) el.def = { ...el.def, requiredLatency: 3 };
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(false);
+  });
+
+  test('wins when latency is below requiredLatency', () => {
+    const game = freshGame();
+    mockCompute(game, { activePctVal: 100, latencyVal: 2 });
+    for (const el of game.elements) el.def = { ...el.def, requiredLatency: 3 };
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(false);
+  });
+
+  test('does not win when latency exceeds requiredLatency', () => {
+    const game = freshGame();
+    mockCompute(game, { activePctVal: 100, latencyVal: 5 });
+    for (const el of game.elements) el.def = { ...el.def, requiredLatency: 3 };
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+
+  test('status message mentions latency when latency requirement unmet', () => {
+    const game = freshGame();
+    mockCompute(game, { activePctVal: 100, latencyVal: 5 });
+    for (const el of game.elements) el.def = { ...el.def, requiredLatency: 3 };
+    game.checkWin();
+    expect(fakeDoc._nodes['status'].textContent.toLowerCase()).toMatch(/latency/);
+  });
+
+  test('does not win when demand is satisfied but another demand has unmet latency', () => {
+    const game = freshGame();
+    const elements = game.elements;
+    if (elements.length < 2) return; // need at least 2 demands
+    // First demand: latency OK; second demand: latency too high
+    game.connMgr.computeActivePct = (els) => {
+      const activePct = new Map();
+      const latency   = new Map();
+      for (const el of els) { activePct.set(el, 100); latency.set(el, 1); }
+      latency.set(elements[1], 5); // second demand exceeds its limit
+      return { activePct, latency, flow: new Map(), received: new Map() };
+    };
+    elements[1].def = { ...elements[1].def, requiredLatency: 3 };
+    game.checkWin();
+    expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
+  });
+});
+
 // ── ConnectionManager integration ─────────────────────────────────────────
 
 describe('ConnectionManager used by Game', () => {

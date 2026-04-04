@@ -433,6 +433,143 @@ describe('ConnectionManager.tryConnect with level demand defs', () => {
   });
 });
 
+// ── latency ───────────────────────────────────────────────────────────────────
+
+describe('computeActivePct latency', () => {
+  // Helper: build a custom element def with optional latency
+  function makeDef({ inputs = {}, outputs = {}, latency } = {}) {
+    const def = { inputs, outputs, color: '#aaa' };
+    if (latency !== undefined) def.latency = latency;
+    return def;
+  }
+
+  // Helper: make a custom element directly (not from ELEM_DEFS)
+  function mkCustomElem(type, def, elemMap) {
+    const el = new GameElement(type, 0, 0, def);
+    elemMap.set(el.id, el);
+    return el;
+  }
+
+  test('source element with default latency (1) has latency 1', () => {
+    const { mgr, mkElem } = makeSetup();
+    const stor = mkElem('Storage'); // no latency in def → default 1
+    const { latency } = mgr.computeActivePct([stor]);
+    expect(latency.get(stor)).toBe(1);
+  });
+
+  test('element with explicit latency uses that value', () => {
+    const { mgr, elemMap } = makeSetup();
+    const def = makeDef({ inputs: {}, outputs: { X: { supply: 10 } }, latency: 5 });
+    const el = mkCustomElem('Custom', def, elemMap);
+    const { latency } = mgr.computeActivePct([el]);
+    expect(latency.get(el)).toBe(5);
+  });
+
+  test('latency accumulates along a chain: source(1) → middle(2) → sink = 4', () => {
+    // source latency 1, middle latency 2, sink latency 1 → total = 1+2+1 = 4
+    const { mgr, elemMap } = makeSetup();
+    const srcDef  = makeDef({ outputs: { X: { supply: 100 } }, latency: 1 });
+    const midDef  = makeDef({ inputs: { X: { demand: 50 } }, outputs: { X: { supply: 100 } }, latency: 2 });
+    const sinkDef = makeDef({ inputs: { X: { demand: 50 } }, outputs: {}, latency: 1 });
+
+    const src  = mkCustomElem('Src',  srcDef,  elemMap);
+    const mid  = mkCustomElem('Mid',  midDef,  elemMap);
+    const sink = mkCustomElem('Sink', sinkDef, elemMap);
+
+    mgr.tryConnect(src, 0, mid, 0);
+    mgr.tryConnect(mid, 0, sink, 0);
+
+    const { latency } = mgr.computeActivePct([src, mid, sink]);
+    expect(latency.get(src)).toBe(1);
+    expect(latency.get(mid)).toBe(3);   // 1 + 2
+    expect(latency.get(sink)).toBe(4);  // 1 + 2 + 1
+  });
+
+  test('latency takes the maximum (critical) path when multiple paths exist', () => {
+    // fast path: src1(1) → sink(1) = 2
+    // slow path: src2(3) → sink(1) = 4
+    // sink latency should be 4 (worst case)
+    const { mgr, elemMap } = makeSetup();
+    const fastDef = makeDef({ outputs: { X: { supply: 100 } }, latency: 1 });
+    const slowDef = makeDef({ outputs: { X: { supply: 100 } }, latency: 3 });
+    const sinkDef = makeDef({ inputs: { X: { demand: 50, multipath: true } }, outputs: {}, latency: 1 });
+
+    const fast = mkCustomElem('Fast', fastDef, elemMap);
+    const slow = mkCustomElem('Slow', slowDef, elemMap);
+    const sink = mkCustomElem('Sink', sinkDef, elemMap);
+
+    mgr.tryConnect(fast, 0, sink, 0);
+    mgr.tryConnect(slow, 0, sink, 0);
+
+    const { latency } = mgr.computeActivePct([fast, slow, sink]);
+    expect(latency.get(sink)).toBe(4);  // max(1+1, 3+1) = 4
+  });
+
+  test('disconnected sink (no incoming) latency equals its own latency', () => {
+    const { mgr, elemMap } = makeSetup();
+    const sinkDef = makeDef({ inputs: { X: { demand: 10 } }, outputs: {}, latency: 2 });
+    const sink = mkCustomElem('Sink', sinkDef, elemMap);
+    const { latency } = mgr.computeActivePct([sink]);
+    expect(latency.get(sink)).toBe(2);
+  });
+
+  test('latency defaults to 1 when not specified in def', () => {
+    const { mgr, elemMap } = makeSetup();
+    const srcDef  = makeDef({ outputs: { X: { supply: 100 } } }); // no latency
+    const sinkDef = makeDef({ inputs: { X: { demand: 50 } }, outputs: {} }); // no latency
+    const src  = mkCustomElem('Src',  srcDef,  elemMap);
+    const sink = mkCustomElem('Sink', sinkDef, elemMap);
+
+    mgr.tryConnect(src, 0, sink, 0);
+
+    const { latency } = mgr.computeActivePct([src, sink]);
+    expect(latency.get(src)).toBe(1);
+    expect(latency.get(sink)).toBe(2);  // 1 + 1
+  });
+
+  test('Storage→Database→WebServer→WebUser latency with default latencies = 3', () => {
+    // Consumer (preset, no outputs) is not counted — latency = upstream hops only.
+    // Longest path: s1(1) → db(1) → ws(1) → demand(not counted) = 3
+    const { mgr, mkElem, elemMap } = makeSetup();
+    const s1 = mkElem('Storage');
+    const s2 = mkElem('Storage');
+    const s3 = mkElem('Storage');
+    const db = mkElem('Database');
+    const ws = mkElem('WebServer');
+
+    const demandDef = {
+      inputs: { WebSite: { demand: 100 } }, outputs: {}, color: '#c93c37', preset: true
+    };
+    const demand = new GameElement('WebUser', 0, 0, demandDef);
+    elemMap.set(demand.id, demand);
+
+    mgr.tryConnect(s1, 0, db, 0);
+    mgr.tryConnect(s2, 0, db, 0);
+    mgr.tryConnect(db, 0, ws, 0);  // SQL
+    mgr.tryConnect(s3, 0, ws, 1);  // Storage
+    mgr.tryConnect(ws, 0, demand, 0);
+
+    const { latency } = mgr.computeActivePct([s1, s2, s3, db, ws, demand]);
+    expect(latency.get(demand)).toBe(3);
+  });
+
+  test('disconnected consumer (preset, no outputs) has latency 0', () => {
+    const { mgr, elemMap } = makeSetup();
+    const demandDef = { inputs: { X: { demand: 10 } }, outputs: {}, preset: true, color: '#aaa' };
+    const demand = new GameElement('Consumer', 0, 0, demandDef);
+    elemMap.set(demand.id, demand);
+    const { latency } = mgr.computeActivePct([demand]);
+    expect(latency.get(demand)).toBe(0);
+  });
+
+  test('latency map is returned even for empty element list', () => {
+    const { mgr } = makeSetup();
+    const { latency } = mgr.computeActivePct([]);
+    expect(latency).toBeDefined();
+    expect(latency.size).toBe(0);
+  });
+});
+
 // ── mid / hit ─────────────────────────────────────────────────────────────────
 
 describe('ConnectionManager.mid', () => {

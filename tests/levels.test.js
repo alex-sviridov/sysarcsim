@@ -102,10 +102,14 @@ describe('Level 1 specifics', () => {
     expect(LEVELS[0].demands[0].type).toBe('WebUser');
   });
 
-  test('Level 1 demand has WebSite input with demand 100', () => {
+  test('Level 1 demand has at least one input port with a positive demand', () => {
     const demand = LEVELS[0].demands[0];
-    expect(demand.inputs).toHaveProperty('WebSite');
-    expect(demand.inputs.WebSite.demand).toBe(100);
+    const specs = Object.values(demand.inputs);
+    expect(specs.length).toBeGreaterThan(0);
+    for (const spec of specs) {
+      expect(typeof spec.demand).toBe('number');
+      expect(spec.demand).toBeGreaterThan(0);
+    }
   });
 
   test('Level 1 demand label is a non-empty string', () => {

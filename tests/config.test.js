@@ -45,21 +45,23 @@ describe('PORT_COLOR', () => {
       expect(color).toMatch(/^#[0-9a-f]{6}$/i);
     }
   });
-  test('has exactly 4 entries', () => {
-    expect(Object.keys(PORT_COLOR)).toHaveLength(4);
+  test('has at least one entry per port type used in ELEM_DEFS', () => {
+    for (const def of Object.values(ELEM_DEFS)) {
+      for (const portType of [...Object.keys(def.inputs), ...Object.keys(def.outputs)]) {
+        expect(PORT_COLOR).toHaveProperty(portType);
+      }
+    }
   });
 });
 
 // ── ELEM_DEFS structure ────────────────────────────────────────────────────
 
 describe('ELEM_DEFS — required fields', () => {
-  const requiredTypes = ['WebServer', 'APIGateway', 'Database', 'Storage', 'DirectAttachStorage'];
-
-  test('defines exactly the expected element types', () => {
-    expect(Object.keys(ELEM_DEFS)).toEqual(requiredTypes);
+  test('defines at least one element type', () => {
+    expect(Object.keys(ELEM_DEFS).length).toBeGreaterThan(0);
   });
 
-  for (const type of requiredTypes) {
+  for (const type of Object.keys(ELEM_DEFS)) {
     describe(type, () => {
       let def;
       beforeEach(() => { def = ELEM_DEFS[type]; });

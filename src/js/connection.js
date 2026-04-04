@@ -142,6 +142,7 @@ export class ConnectionManager {
     const flow      = new Map(); // `${elemId}:${portIdx}` → total output flow (for display)
     const connRatio = new Map(); // connId → 0..1 share of source port capacity
     const received  = new Map(); // `${elemId}:${portIdx}` → received at input
+    const latency   = new Map(); // GameElement → cumulative max-path latency
 
     const connsByPort = new Map(); // `${fromId}:${fromPort}` → Connection[]
     for (const c of this.connections) {
@@ -152,6 +153,20 @@ export class ConnectionManager {
 
     for (const el of sorted) {
       const inK = inputKeys(el.def);
+      // Latency: max upstream latency (critical path) + own latency.
+      // Consumers (preset, no outputs) are not counted — they show the upstream total.
+      const isConsumer = el.def.preset && outputKeys(el.def).length === 0;
+      const ownLatency = isConsumer ? 0 : (el.def.latency ?? 1);
+
+      let maxUpstream = 0;
+      for (const c of this.connections) {
+        if (c.toId !== el.id) continue;
+        const fromEl = elemById.get(c.fromId);
+        if (!fromEl) continue;
+        const upstreamLatency = latency.get(fromEl) ?? 0;
+        if (upstreamLatency > maxUpstream) maxUpstream = upstreamLatency;
+      }
+      latency.set(el, maxUpstream + ownLatency);
 
       if (inK.length === 0) {
         activePct.set(el, 100);
@@ -191,6 +206,39 @@ export class ConnectionManager {
       }
     }
 
-    return { activePct, flow, connRatio, received };
+    return { activePct, flow, connRatio, received, latency };
+  }
+
+  // Returns the set of element IDs and connection IDs on the critical (max-latency) path
+  // ending at demandEl. Uses the latency map from computeActivePct.
+  criticalPath(latencyMap, demandEl) {
+    const elemIds = new Set();
+    const connIds = new Set();
+
+    const walk = (el) => {
+      elemIds.add(el.id);
+      // Find the incoming connection from the upstream element with the highest latency
+      let bestConn     = null;
+      let bestUpstream = null;
+      let bestLatency  = -1;
+      for (const c of this.connections) {
+        if (c.toId !== el.id) continue;
+        const fromEl = this.#elemMap.get(c.fromId);
+        if (!fromEl) continue;
+        const upLat = latencyMap.get(fromEl) ?? 0;
+        if (upLat > bestLatency) {
+          bestLatency  = upLat;
+          bestConn     = c;
+          bestUpstream = fromEl;
+        }
+      }
+      if (bestConn) {
+        connIds.add(bestConn.id);
+        walk(bestUpstream);
+      }
+    };
+
+    walk(demandEl);
+    return { elemIds, connIds };
   }
 }

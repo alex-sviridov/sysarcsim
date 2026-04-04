@@ -1,7 +1,8 @@
 import { PORT_COLOR, outputKeys, inputKeys, GRID_SIZE, REMOVE_ICON_R, SNAP_INDICATOR_R, PORT_R } from './config.js';
 import { drawBezier, bezierPoint } from './bezier.js';
 
-const GLOW_DURATION = 300;  // ms the port glow lasts after a packet arrives
+const GLOW_DURATION          = 300;   // ms the port glow lasts after a packet arrives
+const CRITICAL_PATH_DURATION = 2000;  // ms the critical-path highlight fades over
 
 export class Renderer {
   #ctx;
@@ -11,9 +12,15 @@ export class Renderer {
   #lastArrival = new Map();
   // `${elemId}:${portIndex}` → { color, time } of most recent hit
   #portGlow    = new Map();
+  // Critical-path highlight: { elemIds: Set, connIds: Set, startTime: number } | null
+  #criticalHighlight = null;
 
   constructor(canvas) {
     this.#ctx = canvas.getContext('2d');
+  }
+
+  showCriticalPath(elemIds, connIds, demandId, now) {
+    this.#criticalHighlight = { elemIds, connIds, demandId, startTime: now };
   }
 
   resize(w, h, dpr) {
@@ -28,7 +35,7 @@ export class Renderer {
     if (!W || !H) return;
 
     const cam = game.camera;
-    const { state, selectedEl, ghostElem, mx, my } = game.input.getRenderState();
+    const { state, selectedEl, ghostElem, mx, my, hoveredLatencyEl } = game.input.getRenderState();
     const result = game.connMgr.computeActivePct(game.elements);
 
     this.#drawGrid(W, H, cam);
@@ -41,7 +48,7 @@ export class Renderer {
 
     this.#drawConnections(game.connMgr.connections, result, game.elemMap, now);
     this.#drawWireInProgress(state);
-    this.#drawElements(game.elements, game.connMgr.connections, result, now);
+    this.#drawElements(game.elements, game.connMgr.connections, result, now, hoveredLatencyEl);
     this.#drawSnapIndicator(state, now);
     this.#drawGhost(ghostElem, mx, my);
 
@@ -102,6 +109,17 @@ export class Renderer {
       ctx.shadowBlur  = wirePct === 100 ? 8 : 0;
       drawBezier(ctx, from.x, from.y, to.x, to.y, color, 2.5, false);
       ctx.restore();
+
+      // Critical-path highlight overlay
+      const cpAlpha = this.#criticalAlpha(c.id, 'conn', now);
+      if (cpAlpha > 0) {
+        ctx.save();
+        ctx.globalAlpha = cpAlpha;
+        ctx.shadowColor = '#79c0ff';
+        ctx.shadowBlur  = 18;
+        drawBezier(ctx, from.x, from.y, to.x, to.y, '#79c0ff', 3.5, false);
+        ctx.restore();
+      }
 
       if (connRatio > 0) {
         this.#drawPackets(ctx, from, to, color, now, connRatio, c.id, c.toId, c.toPort);
@@ -237,16 +255,17 @@ export class Renderer {
     drawBezier(ctx, from.x, from.y, tx, ty, wireColor, 2, true);
   }
 
-  #drawElements(elements, connections, result, now) {
+  #drawElements(elements, connections, result, now, hoveredLatencyEl = null) {
     const connMap = new Map(); // elemId → Set<portIndex>
     for (const c of connections) {
       if (!connMap.has(c.toId)) connMap.set(c.toId, new Set());
       connMap.get(c.toId).add(c.toPort);
     }
     for (const el of elements) {
-      el.draw(this.#ctx, connMap.get(el.id) || new Set(), result.activePct.get(el) ?? 0, result);
+      el.draw(this.#ctx, connMap.get(el.id) || new Set(), result.activePct.get(el) ?? 0, result, el === hoveredLatencyEl, now);
       this.#drawPortGlows(el, now);
       this.#drawStarvedPorts(el, result, now);
+      this.#drawCriticalPathBorder(el, now);
     }
   }
 
@@ -387,5 +406,35 @@ export class Renderer {
     ctx.moveTo(cx + 4, cy - 4);
     ctx.lineTo(cx - 4, cy + 4);
     ctx.stroke();
+  }
+
+  // Returns 0–1 fade alpha for a critical-path item; clears highlight when fully faded.
+  #criticalAlpha(id, kind, now) {
+    if (!this.#criticalHighlight) return 0;
+    const { elemIds, connIds, demandId, startTime } = this.#criticalHighlight;
+    const inPath = kind === 'elem' ? (elemIds.has(id) && id !== demandId) : connIds.has(id);
+    if (!inPath) return 0;
+    const age = now - startTime;
+    if (age >= CRITICAL_PATH_DURATION) {
+      this.#criticalHighlight = null;
+      return 0;
+    }
+    return 1 - age / CRITICAL_PATH_DURATION;
+  }
+
+  #drawCriticalPathBorder(el, now) {
+    const alpha = this.#criticalAlpha(el.id, 'elem', now);
+    if (alpha <= 0) return;
+    const ctx = this.#ctx;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#79c0ff';
+    ctx.lineWidth   = 2.5;
+    ctx.shadowColor = '#79c0ff';
+    ctx.shadowBlur  = 16;
+    ctx.beginPath();
+    ctx.roundRect(el.x, el.y, el.w, el.h, 8);
+    ctx.stroke();
+    ctx.restore();
   }
 }

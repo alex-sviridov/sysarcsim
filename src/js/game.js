@@ -144,6 +144,12 @@ export class Game {
     bus.on(Events.CHECK_WIN, () => this.checkWin());
 
     bus.on(Events.SET_STATUS, ({ msg, duration }) => this.#setStatus(msg, duration));
+
+    bus.on(Events.CRITICAL_PATH_CLICK, ({ demandEl }) => {
+      const result = this.connMgr.computeActivePct(this.state.elements);
+      const { elemIds, connIds } = this.connMgr.criticalPath(result.latency, demandEl);
+      this.#renderer.showCriticalPath(elemIds, connIds, demandEl.id, performance.now());
+    });
   }
 
   // ── Game actions ──────────────────────────────────────────────────────────
@@ -168,12 +174,24 @@ export class Game {
     const demands = this.state.elements.filter(e => e.def.preset);
     if (!demands.length) return;
     const result = this.connMgr.computeActivePct(this.state.elements);
-    this.state.won = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
+
+    const allFlowMet    = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
+    const latencyUnmet  = demands.filter(d =>
+      d.def.requiredLatency != null &&
+      (result.latency?.get(d) ?? 0) > d.def.requiredLatency
+    );
+    const allLatencyMet = latencyUnmet.length === 0;
+
+    this.state.won = allFlowMet && allLatencyMet;
     this.#winBadge.hidden = !this.state.won;
+
     if (this.state.won) {
       this.#setStatus('All demands satisfied.');
       this.#nextLevelBtn.hidden = this.state.levelIndex >= LEVELS.length - 1;
     } else {
+      if (allFlowMet && !allLatencyMet) {
+        this.#setStatus('Latency too high — reduce the path length.');
+      }
       this.#nextLevelBtn.hidden = true;
     }
   }

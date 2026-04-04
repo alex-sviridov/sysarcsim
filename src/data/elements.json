@@ -27,6 +27,14 @@
     "color": "#f0883e",
     "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><rect x=\"2\" y=\"5\" width=\"16\" height=\"12\" rx=\"1\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><line x1=\"2\" y1=\"9\" x2=\"18\" y2=\"9\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"10\" cy=\"13.5\" r=\"1.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>"
   },
+  "WAF": {
+    "label": "Web Application Firewall",
+    "inputs": { "WebSite": { "demand": 100 } },
+    "outputs": { "WebSite": { "supply": 100 } },
+    "color": "#d73a49",
+    "latency": 2,
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" d=\"M10 2 L4 5 L4 11 C4 16 7 18.5 10 19 C13 18.5 16 16 16 11 L16 5 Z\"/><polyline points=\"7,10 9,12.5 13,8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>"
+  },
   "DirectAttachStorage": {
     "label": "Direct Attach Storage",
     "inputs": {},

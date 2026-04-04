@@ -110,9 +110,10 @@ function makeMockEl(x = 100, y = 100, def = null) {
       1
     ) * ROW_H,
     def,
-    hitBody:        jest.fn(() => false),
-    hitOutputPort:  jest.fn(() => -1),
-    hitInputPort:   jest.fn(() => -1),
+    hitBody:         jest.fn(() => false),
+    hitOutputPort:   jest.fn(() => -1),
+    hitInputPort:    jest.fn(() => -1),
+    hitLatencyLabel: jest.fn(() => false),
     inputPos:       jest.fn(i => ({ x, y: y + HEADER_H + (i + 0.5) * ROW_H })),
     outputPos:      jest.fn(i => ({ x: x + ELEM_W, y: y + HEADER_H + (i + 0.5) * ROW_H })),
   };
@@ -132,7 +133,7 @@ describe('getRenderState', () => {
   test('initial state: { state:null, selectedEl:null, ghostElem:null, mx:0, my:0 }', () => {
     const { handler } = makeSetup();
     expect(handler.getRenderState()).toEqual({
-      state: null, selectedEl: null, ghostElem: null, mx: 0, my: 0,
+      state: null, selectedEl: null, ghostElem: null, mx: 0, my: 0, hoveredLatencyEl: null,
     });
   });
 

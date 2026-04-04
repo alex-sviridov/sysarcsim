@@ -30,6 +30,12 @@ A browser-based game where you play as a system architect. Build system architec
 - The level is complete when all demand inputs are satisfied by a valid chain of connected elements.
 - Preset elements (User Demand) cannot be moved or removed.
 
+## Latency
+
+Each element has an optional `latency` value (default: `1`). The **latency counter** on a consumer shows the critical-path sum of all upstream elements — click it to highlight that path in blue.
+
+When a demand defines `requiredLatency`, the counter shows `current/limit` and pulses red if the limit is exceeded. The level cannot be won until the path is short enough.
+
 ## Level 1 Example
 
 **Goal:** satisfy a `WebSite` demand.

@@ -1,6 +1,7 @@
 import { PORT_SNAP, REMOVE_HIT_R, inputKeys, outputKeys } from './config.js';
 import { Events } from './event-bus.js';
 
+
 export class InputHandler {
   // state shapes:
   //   null
@@ -18,6 +19,7 @@ export class InputHandler {
   #dragStartEl      = null;
   #dragStartPos     = null;
   #dragMoved        = false;
+  #hoveredLatencyEl = null;
 
   // Pending/ghost state owned by Sidebar; mirrored here for rendering
   #pendingType      = null;
@@ -55,11 +57,12 @@ export class InputHandler {
   /** Exposes read-only render state to Renderer without leaking internals. */
   getRenderState() {
     return {
-      state:      this.state,
-      selectedEl: this.selectedEl,
-      ghostElem:  this.#ghostElem,
-      mx:         this.#mx,
-      my:         this.#my,
+      state:            this.state,
+      selectedEl:       this.selectedEl,
+      ghostElem:        this.#ghostElem,
+      mx:               this.#mx,
+      my:               this.#my,
+      hoveredLatencyEl: this.#hoveredLatencyEl,
     };
   }
 
@@ -121,6 +124,15 @@ export class InputHandler {
       this.#bus.emit(Events.WIRE_COMPLETE, { fromElem, fromPort, x, y, snap });
       this.state = null;
       return;
+    }
+
+    // Latency label click on demand elements
+    for (let i = this.#elements.length - 1; i >= 0; i--) {
+      const el = this.#elements[i];
+      if (el.hitLatencyLabel(x, y)) {
+        this.#bus.emit(Events.CRITICAL_PATH_CLICK, { demandEl: el });
+        return;
+      }
     }
 
     // Output ports take priority (start wire)
@@ -203,6 +215,7 @@ export class InputHandler {
 
     this.#mx = x;
     this.#my = y;
+    this.#hoveredLatencyEl = this.#elements.find(el => el.hitLatencyLabel(x, y)) ?? null;
 
     if (this.state?.mode === 'pan') {
       this.#cam.x = this.state.camX + (sx - this.state.sx);
@@ -238,6 +251,7 @@ export class InputHandler {
     if (this.state?.mode === 'wire') return 'crosshair';
     for (let i = this.#elements.length - 1; i >= 0; i--) {
       const el = this.#elements[i];
+      if (el.hitLatencyLabel(x, y)) return 'pointer';
       if (el.hitOutputPort(x, y) !== -1 || el.hitInputPort(x, y) !== -1) return 'crosshair';
       if (el.hitBody(x, y)) return this.#pendingType ? 'not-allowed' : 'grab';
     }

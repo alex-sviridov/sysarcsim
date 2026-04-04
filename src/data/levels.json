@@ -9,10 +9,11 @@
         "inputs":  { "WebSite": { "demand": 100 } },
         "outputs": {},
         "color":   "#c93c37",
+        "requiredLatency": 3,
         "preset":  true
       }
     ],
-    "available": ["WebServer", "Database", "Storage", "DirectAttachStorage"]
+    "available": ["WAF", "WebServer", "Database", "Storage", "DirectAttachStorage"]
   },
   {
     "title": "Level 2 — Web & Mobile",

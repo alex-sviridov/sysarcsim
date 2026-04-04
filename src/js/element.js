@@ -1,5 +1,7 @@
 import { ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_COLOR, inputKeys, outputKeys } from './config.js';
 
+const LATENCY_ROW_H = 22; // extra height reserved for the latency label on demand elements
+
 export class GameElement {
   static #counter = 0;
   static resetCounter() { GameElement.#counter = 0; }
@@ -13,8 +15,9 @@ export class GameElement {
     this.x    = x;
     this.y    = y;
     const rows = Math.max(inputKeys(def).length, outputKeys(def).length, 1);
+    const isDemand = def.preset && outputKeys(def).length === 0;
     this.w = ELEM_W;
-    this.h = HEADER_H + rows * ROW_H;
+    this.h = HEADER_H + rows * ROW_H + (isDemand ? LATENCY_ROW_H : 0);
 
     if (def.icon) {
       this.#iconImg = new Image();
@@ -44,6 +47,13 @@ export class GameElement {
     return -1;
   }
 
+  hitLatencyLabel(px, py) {
+    if (!this.def.preset || outputKeys(this.def).length !== 0) return false;
+    const labelY = this.y + this.h - LATENCY_ROW_H / 2;
+    return px >= this.x && px <= this.x + this.w &&
+           Math.abs(py - labelY) < LATENCY_ROW_H / 2;
+  }
+
   hitOutputPort(px, py) {
     const keys = outputKeys(this.def);
     for (let i = 0; i < keys.length; i++) {
@@ -53,7 +63,7 @@ export class GameElement {
     return -1;
   }
 
-  draw(ctx, connectedInputs, activePct, computeResult) {
+  draw(ctx, connectedInputs, activePct, computeResult, latencyHovered = false, now = 0) {
     const { x, y, w, h, def } = this;
     const alpha = 0.38 + (activePct / 100) * 0.62;
 
@@ -146,6 +156,38 @@ export class GameElement {
       ctx.strokeStyle = col;
       ctx.lineWidth = 2;
       ctx.stroke();
+    }
+
+    // Latency display on demand (preset, output-less) elements
+    if (def.preset && outputKeys(def).length === 0 && computeResult) {
+      const lat      = computeResult.latency?.get(this) ?? 0;
+      const labelY   = y + h - LATENCY_ROW_H / 2;
+      const required = def.requiredLatency;
+      const unmet    = required != null && lat > required;
+
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      if (unmet) {
+        // Heartbeat: pulse brightness between dim red and bright red
+        const PULSE   = 800; // ms per cycle
+        const beat    = (now % PULSE) / PULSE;           // 0→1
+        const bright  = Math.sin(beat * Math.PI * 2) * 0.5 + 0.5; // 0→1 sinusoidal
+        const r       = Math.round(248);
+        const g       = Math.round(81  * (1 - bright * 0.4));
+        const b       = Math.round(73  * (1 - bright * 0.4));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.shadowColor = '#f85149';
+        ctx.shadowBlur  = 4 + bright * 6;
+      } else {
+        ctx.fillStyle   = latencyHovered ? '#c9d1d9' : '#8b949e';
+        ctx.shadowBlur  = 0;
+      }
+
+      const label = required != null ? `latency: ${lat}/${required}` : `latency: ${lat}`;
+      ctx.fillText(label, x + w / 2, labelY);
+      ctx.shadowBlur = 0;
     }
 
     // Output ports (right side)
