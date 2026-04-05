@@ -8,6 +8,7 @@ export const Events = {
   PENDING_CHANGED:    'sidebar:pending',      // { type, ghostElem } | { type: null, ghostElem: null }
   SIDEBAR_DRAG_START: 'sidebar:drag-start',   // {} — card was pressed (mousedown), drag may follow
   LEVEL_NEXT:      'level:next',       // {}
+  LEVEL_PREV:      'level:prev',       // {}
   GAME_RESET:      'game:reset',       // {}
   CHECK_WIN:       'game:check-win',   // {}
   SET_STATUS:      'game:set-status',  // { msg, duration? }

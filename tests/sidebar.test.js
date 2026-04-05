@@ -8,6 +8,7 @@
 import { jest } from '@jest/globals';
 import { EventBus, Events } from '../src/js/event-bus.js';
 import { ELEM_DEFS } from '../src/js/config.js';
+import { LEVELS } from '../src/js/levels.js';
 
 // ── Browser stubs ─────────────────────────────────────────────────────────────
 
@@ -141,19 +142,24 @@ function makeDocumentStub() {
   const sidebarNode    = makeNode('div');
   const sidebarCards   = makeNode('div');
   const btnNextLevel   = makeNode('button');
+  const btnPrevLevel   = makeNode('button');
   const btnReset       = makeNode('button');
   const levelTitle     = makeNode('div');
   const desk           = makeNode('canvas');
 
   const nodes = {
-    sidebar:          sidebarNode,
-    'sidebar-cards':  sidebarCards,
-    'btn-next-level': btnNextLevel,
-    'btn-reset':      btnReset,
-    'level-title':    levelTitle,
+    sidebar:                    sidebarNode,
+    'sidebar-cards':            sidebarCards,
+    'btn-next-level':           btnNextLevel,
+    'btn-prev-level':           btnPrevLevel,
+    'btn-reset':                btnReset,
+    'level-title':              levelTitle,
+    'level-description-popup':  makeNode('div'),
+    'btn-info':                 makeNode('button'),
+    'sidebar-section-label':    makeNode('div'),
     desk,
-    'win-badge':      makeNode('div'),
-    status:           makeNode('div'),
+    'win-badge':                makeNode('div'),
+    status:                     makeNode('div'),
   };
 
   return {
@@ -189,6 +195,16 @@ const { Sidebar } = await import('../src/js/sidebar.js');
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
+// Canonical level objects — reused so LEVELS.indexOf() works correctly.
+const LEVEL_A = { slug: 'level-a', title: 'Level A', description: 'Desc A', demands: [], available: ['WebServer', 'Database'] };
+const LEVEL_B = { slug: 'level-b', title: 'Level B', description: 'Desc B', demands: [], available: ['WebServer'] };
+const LEVEL_C = { slug: 'level-c', title: 'Level C', description: 'Desc C', demands: [], available: ['Database'] };
+
+beforeEach(() => {
+  LEVELS.length = 0;
+  LEVELS.push(LEVEL_A, LEVEL_B, LEVEL_C);
+});
+
 function freshSetup() {
   fakeDoc = makeDocumentStub();
   global.document = fakeDoc;
@@ -198,11 +214,7 @@ function freshSetup() {
 }
 
 function level1() {
-  return {
-    title:     'Level 1 — Web Service',
-    demands:   [],
-    available: ['WebServer', 'Database'],
-  };
+  return LEVEL_A;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -217,7 +229,7 @@ describe('Sidebar.build()', () => {
   test('sets level-title.textContent to level.title', () => {
     const { sidebar, nodes } = freshSetup();
     sidebar.build(level1());
-    expect(nodes['level-title'].textContent).toBe('Level 1 — Web Service');
+    expect(nodes['level-title'].textContent).toBe(level1().title);
   });
 
   test('creates correct number of cards (one per available type)', () => {
@@ -492,5 +504,78 @@ describe('Sidebar button events', () => {
     bus.on(Events.LEVEL_NEXT, fn);
     nodes['btn-next-level']._fire('click');
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  test('btn-prev-level click emits LEVEL_PREV', () => {
+    const { bus, nodes } = freshSetup();
+    const fn = jest.fn();
+    bus.on(Events.LEVEL_PREV, fn);
+    nodes['btn-prev-level']._fire('click');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sidebar nav button state', () => {
+  test('prev button is disabled on first level', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A); // first level
+    expect(nodes['btn-prev-level'].disabled).toBe(true);
+  });
+
+  test('prev button is enabled on non-first level', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_B); // middle level
+    expect(nodes['btn-prev-level'].disabled).toBe(false);
+  });
+
+  test('next button is enabled before winning on non-last level', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A);
+    expect(nodes['btn-next-level'].disabled).toBe(false);
+  });
+
+  test('next button is enabled after setWon(true) on non-last level', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A);
+    sidebar.setWon(true);
+    expect(nodes['btn-next-level'].disabled).toBe(false);
+    expect(nodes['btn-next-level'].classList.contains('btn-next--ready')).toBe(true);
+  });
+
+  test('next button stays disabled after setWon(true) on last level', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_C); // last level
+    sidebar.setWon(true);
+    expect(nodes['btn-next-level'].disabled).toBe(true);
+  });
+
+  test('next button loses ready style after setWon(false)', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A);
+    sidebar.setWon(true);
+    sidebar.setWon(false);
+    expect(nodes['btn-next-level'].disabled).toBe(false);
+    expect(nodes['btn-next-level'].classList.contains('btn-next--ready')).toBe(false);
+  });
+
+  test('build() resets won style — next button no longer ready', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A);
+    sidebar.setWon(true);
+    sidebar.build(LEVEL_B); // rebuild resets won
+    expect(nodes['btn-next-level'].disabled).toBe(false);
+    expect(nodes['btn-next-level'].classList.contains('btn-next--ready')).toBe(false);
+  });
+
+  test('description popup is hidden after build()', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A);
+    expect(nodes['level-description-popup'].hidden).toBe(true);
+  });
+
+  test('description popup text is set to level description', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_A);
+    expect(nodes['level-description-popup'].textContent).toBe('Desc A');
   });
 });

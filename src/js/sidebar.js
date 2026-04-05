@@ -8,6 +8,7 @@ export class Sidebar {
   #pendingType  = null;
   #ghostElem    = null;
   #limitReached = false;
+  #currentLevel = null;
 
   constructor(bus) {
     this.#bus = bus;
@@ -22,12 +23,14 @@ export class Sidebar {
 
   build(level) {
     this.clearPending();
-    this.#limitReached = false;
+    this.#limitReached  = false;
+    this.#currentLevel  = level;
 
-    const titleEl   = document.getElementById('level-title');
+    document.getElementById('level-title').textContent             = level.title;
+    document.getElementById('level-description-popup').textContent = level.description ?? '';
+    document.getElementById('level-description-popup').hidden      = true;
+
     const container = document.getElementById('sidebar-cards');
-
-    titleEl.textContent = level.title;
     container.innerHTML = '';
 
     for (const type of level.available) {
@@ -35,6 +38,14 @@ export class Sidebar {
       const card = document.createElement('div');
       card.className    = 'card';
       card.dataset.type = type;
+
+      // Icon
+      if (def.icon) {
+        const iconEl = document.createElement('div');
+        iconEl.className = 'card-icon';
+        iconEl.innerHTML = def.icon;
+        card.appendChild(iconEl);
+      }
 
       const nameEl = document.createElement('div');
       nameEl.className   = 'card-name';
@@ -45,13 +56,13 @@ export class Sidebar {
       for (const k of outputKeys(def)) {
         const span = document.createElement('span');
         span.className   = 'out';
-        span.textContent = `▶ ${k} (${def.outputs[k].supply})`;
+        span.textContent = `▶ ${k} ${def.outputs[k].supply}`;
         ioEl.appendChild(span);
       }
       for (const k of inputKeys(def)) {
         const span = document.createElement('span');
         span.className   = 'in';
-        span.textContent = `◀ ${k} (${def.inputs[k].demand})`;
+        span.textContent = `◀ ${k} ${def.inputs[k].demand}`;
         ioEl.appendChild(span);
       }
 
@@ -59,6 +70,24 @@ export class Sidebar {
       card.appendChild(ioEl);
       container.appendChild(card);
     }
+
+    this.#updateNavButtons(false);
+  }
+
+  setWon(won) {
+    document.getElementById('win-badge').hidden = !won;
+    this.#updateNavButtons(won);
+  }
+
+  #updateNavButtons(won = false) {
+    const idx     = LEVELS.indexOf(this.#currentLevel);
+    const isLast  = idx >= LEVELS.length - 1;
+    const prevBtn = document.getElementById('btn-prev-level');
+    const nextBtn = document.getElementById('btn-next-level');
+
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = isLast;
+    nextBtn.classList.toggle('btn-next--ready', won && !isLast);
   }
 
   clearPending() {
@@ -72,7 +101,6 @@ export class Sidebar {
   #bindButtons() {
     const sidebar = document.getElementById('sidebar');
     const cards   = document.getElementById('sidebar-cards');
-    const nextBtn = document.getElementById('btn-next-level');
 
     sidebar.addEventListener('mousedown', e => {
       if (!e.target.closest('.card[data-type]')) this.clearPending();
@@ -101,12 +129,30 @@ export class Sidebar {
       }
     });
 
+    document.getElementById('btn-info').addEventListener('click', e => {
+      e.stopPropagation();
+      const popup = document.getElementById('level-description-popup');
+      popup.hidden = !popup.hidden;
+    });
+
+    document.addEventListener('click', () => {
+      document.getElementById('level-description-popup').hidden = true;
+    });
+
     document.getElementById('btn-reset').addEventListener('click', () => {
       this.#bus.emit(Events.GAME_RESET, {});
     });
 
-    nextBtn.addEventListener('click', () => {
-      this.#bus.emit(Events.LEVEL_NEXT, {});
+    document.getElementById('btn-next-level').addEventListener('click', () => {
+      if (!document.getElementById('btn-next-level').disabled) {
+        this.#bus.emit(Events.LEVEL_NEXT, {});
+      }
+    });
+
+    document.getElementById('btn-prev-level').addEventListener('click', () => {
+      if (!document.getElementById('btn-prev-level').disabled) {
+        this.#bus.emit(Events.LEVEL_PREV, {});
+      }
     });
   }
 }

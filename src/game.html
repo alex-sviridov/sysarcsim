@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sysarcsim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <canvas id="desk"></canvas>
+    <div id="viewport-controls">
+      <button id="btn-zoom-in" title="Zoom in">+</button>
+      <button id="btn-zoom-out" title="Zoom out">−</button>
+      <button id="btn-center" title="Center view">⊡</button>
+    </div>
+    <aside id="sidebar">
+      <div id="sidebar-header">
+        <div id="sidebar-top-row">
+          <a href="index.html" id="back-link">← All levels</a>
+          <div id="sidebar-nav">
+            <button id="btn-prev-level" title="Previous level">←</button>
+            <button id="btn-next-level" title="Next level">→</button>
+          </div>
+        </div>
+        <div id="level-title-row">
+          <div id="level-title"></div>
+          <button id="btn-info" title="Level description" aria-label="Show level description">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="10" cy="10" r="8"/>
+              <line x1="10" y1="9" x2="10" y2="14" stroke-linecap="round"/>
+              <circle cx="10" cy="6.5" r="0.75" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
+          <div id="level-description-popup" hidden></div>
+        </div>
+        <div id="win-badge" hidden>✓ Complete</div>
+      </div>
+
+      <div id="sidebar-section-label">Components</div>
+      <div id="sidebar-cards"></div>
+
+      <div class="sidebar-hint">
+        Click or drag to place.<br>
+        <span class="hint-out">Output</span> → <span class="hint-in">input</span> to connect.<br>
+        Right-click to remove.
+      </div>
+    </aside>
+  </div>
+
+  <div id="controls">
+    <span id="elem-count"></span>
+    <span id="status">Connect elements to satisfy the demand.</span>
+    <button id="btn-reset">Reset</button>
+  </div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

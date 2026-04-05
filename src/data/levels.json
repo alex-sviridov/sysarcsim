@@ -1,6 +1,9 @@
 [
   {
+    "slug": "level-1",
     "title": "Level 1 — Web Service",
+    "description": "Launch a basic web service that can handle incoming user traffic. Place the right components to route requests and store data.",
+    "hint": "Start with a web server to handle requests, then add a database to persist data.",
     "elementsLimit": 0,
     "demands": [
       {
@@ -10,13 +13,17 @@
         "outputs": {},
         "color":   "#c93c37",
         "requiredLatency": 3,
-        "preset":  true
+        "preset":  true,
+        "icon":    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><circle cx=\"10\" cy=\"6\" r=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" d=\"M4 18 C4 13 16 13 16 18\"/></svg>"
       }
     ],
     "available": ["WAF", "WebServer", "Database", "Storage", "DirectAttachStorage"]
   },
   {
+    "slug": "level-2",
     "title": "Level 2 — Web & Mobile",
+    "description": "Your service is growing. Support both web and mobile clients by exposing dedicated endpoints for each platform.",
+    "hint": "Mobile clients need an API Gateway to access backend services separately from the web frontend.",
     "elementsLimit": 0,
     "demands": [
       {
@@ -25,7 +32,8 @@
         "inputs":  { "WebSite": { "demand": 100, "multipath": true } },
         "outputs": {},
         "color":   "#c93c37",
-        "preset":  true
+        "preset":  true,
+        "icon":    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><circle cx=\"10\" cy=\"6\" r=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" d=\"M4 18 C4 13 16 13 16 18\"/></svg>"
       },
       {
         "type":    "MobileUser",
@@ -33,9 +41,39 @@
         "inputs":  { "MobileAPI": { "demand": 80 } },
         "outputs": {},
         "color":   "#8957e5",
-        "preset":  true
+        "preset":  true,
+        "icon":    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><rect x=\"6\" y=\"1\" width=\"8\" height=\"14\" rx=\"1.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"10\" cy=\"13\" r=\"0.75\" fill=\"currentColor\"/><line x1=\"8\" y1=\"18\" x2=\"12\" y2=\"18\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><line x1=\"10\" y1=\"15\" x2=\"10\" y2=\"18\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>"
       }
     ],
     "available": ["WebServer", "APIGateway", "Database", "Storage", "DirectAttachStorage"]
+  },
+  {
+    "slug": "level-3",
+    "title": "Level 3 — Under Attack",
+    "description": "Traffic is surging and bad actors are probing your service. Secure your web frontend without breaking mobile access, and keep latency low.",
+    "hint": "A WAF can filter malicious web traffic — place it between your users and the web server. Mobile traffic bypasses the WAF but still needs its own gateway.",
+    "elementsLimit": 0,
+    "demands": [
+      {
+        "type":    "WebUser",
+        "label":   "Web User",
+        "inputs":  { "WebSite": { "demand": 100 } },
+        "outputs": {},
+        "color":   "#c93c37",
+        "requiredLatency": 5,
+        "preset":  true,
+        "icon":    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><circle cx=\"10\" cy=\"6\" r=\"3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" d=\"M4 18 C4 13 16 13 16 18\"/></svg>"
+      },
+      {
+        "type":    "MobileUser",
+        "label":   "Mobile User",
+        "inputs":  { "MobileAPI": { "demand": 80 } },
+        "outputs": {},
+        "color":   "#8957e5",
+        "preset":  true,
+        "icon":    "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 20 20\"><rect x=\"6\" y=\"1\" width=\"8\" height=\"14\" rx=\"1.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><circle cx=\"10\" cy=\"13\" r=\"0.75\" fill=\"currentColor\"/><line x1=\"8\" y1=\"18\" x2=\"12\" y2=\"18\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/><line x1=\"10\" y1=\"15\" x2=\"10\" y2=\"18\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>"
+      }
+    ],
+    "available": ["WAF", "WebServer", "APIGateway", "Database", "Storage", "DirectAttachStorage"]
   }
 ]

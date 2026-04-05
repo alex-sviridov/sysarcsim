@@ -38,9 +38,13 @@ function makeNode(tagName = 'div') {
     children:    [],
     classList: {
       _classes: new Set(),
-      add(c)      { this._classes.add(c); },
-      remove(c)   { this._classes.delete(c); },
-      contains(c) { return this._classes.has(c); },
+      add(c)       { this._classes.add(c); },
+      remove(c)    { this._classes.delete(c); },
+      contains(c)  { return this._classes.has(c); },
+      toggle(c, f) {
+        const force = f !== undefined ? f : !this._classes.has(c);
+        force ? this._classes.add(c) : this._classes.delete(c);
+      },
     },
     addEventListener(ev, fn) {
       if (!listeners[ev]) listeners[ev] = [];
@@ -64,15 +68,21 @@ function makeDocumentStub() {
     'desk':           makeNode('canvas'),
     'status':         makeNode(),
     'elem-count':     makeNode(),
-    'win-badge':      makeNode(),
-    'btn-next-level': makeNode(),
-    'sidebar':        makeNode(),
-    'sidebar-cards':  makeNode(),
-    'btn-reset':      makeNode(),
-    'level-title':    makeNode(),
-    'btn-zoom-in':    makeNode(),
-    'btn-zoom-out':   makeNode(),
-    'btn-center':     makeNode(),
+    'win-badge':              makeNode(),
+    'btn-next-level':         makeNode('button'),
+    'btn-prev-level':         makeNode('button'),
+    'sidebar':                makeNode(),
+    'sidebar-header':         makeNode(),
+    'sidebar-cards':          makeNode(),
+    'sidebar-nav':            makeNode(),
+    'sidebar-section-label':  makeNode(),
+    'btn-reset':              makeNode('button'),
+    'level-title':              makeNode(),
+    'level-description-popup':  makeNode(),
+    'btn-info':                 makeNode('button'),
+    'btn-zoom-in':            makeNode('button'),
+    'btn-zoom-out':           makeNode('button'),
+    'btn-center':             makeNode('button'),
   };
   return {
     _nodes: nodes,
@@ -97,6 +107,7 @@ global.window = {
     if (!windowListeners[ev]) windowListeners[ev] = [];
     windowListeners[ev].push(fn);
   }),
+  location: { search: '', href: '' },
 };
 
 global.setTimeout  = () => 0;

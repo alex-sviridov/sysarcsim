@@ -42,9 +42,13 @@ function makeNode(tagName = 'div') {
     children:    [],
     classList: {
       _classes: new Set(),
-      add(c)    { this._classes.add(c); },
-      remove(c) { this._classes.delete(c); },
-      contains(c) { return this._classes.has(c); },
+      add(c)        { this._classes.add(c); },
+      remove(c)     { this._classes.delete(c); },
+      contains(c)   { return this._classes.has(c); },
+      toggle(c, f)  {
+        const force = f !== undefined ? f : !this._classes.has(c);
+        force ? this._classes.add(c) : this._classes.delete(c);
+      },
     },
     addEventListener(ev, fn) {
       if (!listeners[ev]) listeners[ev] = [];
@@ -66,18 +70,24 @@ function makeNode(tagName = 'div') {
 
 function makeDocumentStub() {
   const nodes = {
-    'desk':           makeNode('canvas'),
-    'status':         makeNode(),
-    'elem-count':     makeNode(),
-    'win-badge':      makeNode(),
-    'btn-next-level': makeNode(),
-    'sidebar':        makeNode(),
-    'sidebar-cards':  makeNode(),
-    'btn-reset':      makeNode(),
-    'level-title':    makeNode(),
-    'btn-zoom-in':    makeNode(),
-    'btn-zoom-out':   makeNode(),
-    'btn-center':     makeNode(),
+    'desk':                   makeNode('canvas'),
+    'status':                 makeNode(),
+    'elem-count':             makeNode(),
+    'win-badge':              makeNode(),
+    'btn-next-level':         makeNode('button'),
+    'btn-prev-level':         makeNode('button'),
+    'sidebar':                makeNode(),
+    'sidebar-header':         makeNode(),
+    'sidebar-cards':          makeNode(),
+    'sidebar-nav':            makeNode(),
+    'sidebar-section-label':  makeNode(),
+    'btn-reset':              makeNode('button'),
+    'level-title':              makeNode(),
+    'level-description-popup':  makeNode(),
+    'btn-info':                 makeNode('button'),
+    'btn-zoom-in':            makeNode('button'),
+    'btn-zoom-out':           makeNode('button'),
+    'btn-center':             makeNode('button'),
   };
 
   return {
@@ -95,6 +105,7 @@ global.document = fakeDoc;
 global.window = {
   devicePixelRatio: 1,
   addEventListener: () => {},
+  location: { href: '' },
 };
 
 global.requestAnimationFrame = () => {};
@@ -109,8 +120,9 @@ const { Game } = await import('../src/js/game.js');
 
 function resetFakeDoc() {
   const nodes = fakeDoc._nodes;
-  nodes['win-badge'].hidden  = true;
-  nodes['btn-next-level'].hidden = true;
+  nodes['win-badge'].hidden      = true;
+  nodes['btn-next-level'].disabled = true;
+  nodes['btn-prev-level'].disabled = true;
   nodes['status'].textContent = '';
 }
 
@@ -168,9 +180,9 @@ describe('Game constructor', () => {
     expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
   });
 
-  test('next level button is hidden initially', () => {
+  test('next level button is enabled initially (non-last level)', () => {
     const game = freshGame();
-    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(false);
   });
 
   test('status message is set after construction', () => {
@@ -205,11 +217,10 @@ describe('Game.reset()', () => {
     expect(fakeDoc._nodes['win-badge'].hidden).toBe(true);
   });
 
-  test('hides next level button on reset', () => {
+  test('next level button remains enabled after reset (non-last level)', () => {
     const game = freshGame();
-    fakeDoc._nodes['btn-next-level'].hidden = false;
     game.reset();
-    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(false);
   });
 
   test('elemMap has same size as elements array after reset', () => {
@@ -308,22 +319,24 @@ describe('Game.checkWin()', () => {
       return { activePct, flow: new Map(), received: new Map() };
     };
     game.checkWin();
-    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(false);
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(false);
   });
 
-  test('hides next level button when on the last level', () => {
-    const game = freshGame();
-    game.levelIndex = LEVELS.length - 1;
+  test('disables next level button when on the last level', () => {
+    GameElement.resetCounter();
+    ConnectionManager.resetCounter();
+    resetFakeDoc();
+    const game = new Game(LEVELS.length - 1); // start at last level
     game.connMgr.computeActivePct = (elements) => {
       const activePct = new Map();
       for (const el of elements) activePct.set(el, 100);
       return { activePct, flow: new Map(), received: new Map() };
     };
     game.checkWin();
-    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(true);
   });
 
-  test('hides next level button when demands are not fully satisfied', () => {
+  test('next level button stays enabled when demands are not fully satisfied', () => {
     const game = freshGame();
     game.connMgr.computeActivePct = (elements) => {
       const activePct = new Map();
@@ -331,7 +344,7 @@ describe('Game.checkWin()', () => {
       return { activePct, flow: new Map(), received: new Map() };
     };
     game.checkWin();
-    expect(fakeDoc._nodes['btn-next-level'].hidden).toBe(true);
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(false);
   });
 });
 
@@ -572,5 +585,114 @@ describe('LEVELS data used by Game', () => {
       expect(Number.isInteger(level.elementsLimit)).toBe(true);
       expect(level.elementsLimit).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+// ── startIndex constructor parameter ─────────────────────────────────────
+
+describe('Game constructor startIndex', () => {
+  function gameAt(index) {
+    GameElement.resetCounter();
+    ConnectionManager.resetCounter();
+    resetFakeDoc();
+    return new Game(index);
+  }
+
+  test('startIndex 0 sets levelIndex to 0', () => {
+    const game = gameAt(0);
+    expect(game.levelIndex).toBe(0);
+  });
+
+  test('startIndex 1 sets levelIndex to 1', () => {
+    if (LEVELS.length < 2) return;
+    const game = gameAt(1);
+    expect(game.levelIndex).toBe(1);
+  });
+
+  test('startIndex 1 populates elements from level 1 demands', () => {
+    if (LEVELS.length < 2) return;
+    const game = gameAt(1);
+    expect(game.elements.length).toBe(LEVELS[1].demands.length);
+  });
+
+  test('omitting startIndex defaults to levelIndex 0', () => {
+    const game = freshGame(); // calls new Game() with no args
+    expect(game.levelIndex).toBe(0);
+  });
+
+  test('elements come from the level at startIndex', () => {
+    const idx  = LEVELS.length - 1;
+    const game = gameAt(idx);
+    expect(game.elements.length).toBe(LEVELS[idx].demands.length);
+  });
+});
+
+// ── Next Level navigates by URL ───────────────────────────────────────────
+
+describe('Next Level button navigates to URL', () => {
+  beforeEach(() => {
+    global.window.location.href = '';
+  });
+
+  test('checkWin on non-last level enables btn-next-level', () => {
+    if (LEVELS.length < 2) return;
+    const game = freshGame(); // level 0
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(false);
+  });
+
+  test('clicking Next Level navigates to game.html with next slug', () => {
+    if (LEVELS.length < 2) return;
+    // Win level 0 first so the button is visible
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    // Fire the btn-next-level click
+    fakeDoc._nodes['btn-next-level']._fire('click');
+    expect(global.window.location.href).toContain('game.html');
+    expect(global.window.location.href).toContain(LEVELS[1].slug);
+  });
+
+  test('Next Level URL contains the correct slug for each level transition', () => {
+    for (let i = 0; i < LEVELS.length - 1; i++) {
+      global.window.location.href = '';
+      GameElement.resetCounter();
+      ConnectionManager.resetCounter();
+      resetFakeDoc();
+      const game = new Game(i);
+      game.connMgr.computeActivePct = (elements) => {
+        const activePct = new Map();
+        for (const el of elements) activePct.set(el, 100);
+        return { activePct, flow: new Map(), received: new Map() };
+      };
+      game.checkWin();
+      fakeDoc._nodes['btn-next-level']._fire('click');
+      expect(global.window.location.href).toContain(LEVELS[i + 1].slug);
+    }
+  });
+
+  test('Next Level button stays disabled when winning on the last level', () => {
+    const lastIdx = LEVELS.length - 1;
+    GameElement.resetCounter();
+    ConnectionManager.resetCounter();
+    resetFakeDoc();
+    const game = new Game(lastIdx);
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    // On the last level the button must remain hidden even after winning
+    expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(true);
   });
 });

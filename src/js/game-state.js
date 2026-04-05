@@ -1,4 +1,3 @@
-import { HEADER_H, ROW_H } from './config.js';
 import { GameElement } from './element.js';
 import { LEVELS } from './levels.js';
 import { ConnectionManager } from './connection.js';
@@ -21,18 +20,21 @@ export class GameState {
     ConnectionManager.resetCounter();
     this.won = false;
 
-    const level  = LEVELS[this.levelIndex];
-    const W      = cssW || 640;
-    const H      = cssH || 440;
-    const demandH = HEADER_H + ROW_H;
+    const level   = LEVELS[this.levelIndex];
+    const W       = cssW || 640;
+    const H       = cssH || 440;
     const gap     = 16;
-    const totalH  = level.demands.length * demandH + (level.demands.length - 1) * gap;
-    const startY  = H / 2 - totalH / 2;
     const demandX = W * 0.65 - 80;
 
-    for (let i = 0; i < level.demands.length; i++) {
-      const def = level.demands[i];
-      const el  = new GameElement(def.type, demandX, startY + i * (demandH + gap), def);
+    // Build elements first to get their real heights, then position them.
+    const elems = level.demands.map(def => new GameElement(def.type, demandX, 0, def));
+    const totalH = elems.reduce((sum, el) => sum + el.h, 0) + (elems.length - 1) * gap;
+    let curY = H / 2 - totalH / 2;
+
+    for (let i = 0; i < elems.length; i++) {
+      const el  = elems[i];
+      el.y = curY;
+      curY += el.h + gap;
       this.elements.push(el);
       this.elemMap.set(el.id, el);
     }

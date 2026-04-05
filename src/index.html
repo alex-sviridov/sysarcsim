@@ -6,35 +6,15 @@
   <title>sysarcsim</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div id="app">
-    <canvas id="desk"></canvas>
-    <div id="viewport-controls">
-      <button id="btn-zoom-in" title="Zoom in">+</button>
-      <button id="btn-zoom-out" title="Zoom out">−</button>
-      <button id="btn-center" title="Center view">⊡</button>
-    </div>
-    <aside id="sidebar">
-      <div class="sidebar-title" id="level-title"></div>
-
-      <div id="sidebar-cards"></div>
-
-      <div class="sidebar-hint">
-        Click or drag to place elements.<br>
-        Drag from <span class="hint-out">output</span> to <span class="hint-in">input</span> to connect.<br>
-        Right-click or select to remove.
-      </div>
-    </aside>
+<body class="level-select-page">
+  <div id="level-select">
+    <header id="ls-header">
+      <h1>sysarcsim</h1>
+      <p>Design system architectures. Satisfy demands.</p>
+    </header>
+    <ol id="level-list"></ol>
   </div>
 
-  <div id="controls">
-    <span id="elem-count"></span>
-    <span id="status">Connect elements to satisfy the demand.</span>
-    <span id="win-badge" hidden>Level Complete</span>
-    <button id="btn-next-level" hidden>Next Level →</button>
-    <button id="btn-reset">Reset</button>
-  </div>
-
-<script type="module" src="js/main.js"></script>
+  <script type="module" src="js/level-select.js"></script>
 </body>
 </html>

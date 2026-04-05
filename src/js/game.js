@@ -27,20 +27,16 @@ export class Game {
   #renderer;
   #statusTimer  = null;
   #statusEl;
-  #winBadge;
-  #nextLevelBtn;
   #elemCountEl;
   #elementsLimit = 0;
   #cssW = 0;
   #cssH = 0;
   #boundLoop;
 
-  constructor() {
-    this.canvas        = document.getElementById('desk');
-    this.#statusEl     = document.getElementById('status');
-    this.#winBadge     = document.getElementById('win-badge');
-    this.#nextLevelBtn = document.getElementById('btn-next-level');
-    this.#elemCountEl  = document.getElementById('elem-count');
+  constructor(startIndex = 0) {
+    this.canvas       = document.getElementById('desk');
+    this.#statusEl    = document.getElementById('status');
+    this.#elemCountEl = document.getElementById('elem-count');
 
     this.#bus      = new EventBus();
     this.connMgr   = new ConnectionManager(this.state.elemMap, this.#bus);
@@ -52,6 +48,8 @@ export class Game {
     this.input = new InputHandler(this.canvas, this.#bus, this.state.elements, this.connMgr, this.camera);
 
     this.#boundLoop = () => this.#loop();
+
+    this.state.levelIndex = startIndex;
 
     this.#setupViewportButtons();
     this.#subscribeEvents();
@@ -106,10 +104,16 @@ export class Game {
     bus.on(Events.GAME_RESET, () => this.reset());
 
     bus.on(Events.LEVEL_NEXT, () => {
-      if (this.state.levelIndex < LEVELS.length - 1) {
-        this.state.levelIndex++;
-        this.#sidebar.build(LEVELS[this.state.levelIndex]);
-        this.reset();
+      const next = this.state.levelIndex + 1;
+      if (next < LEVELS.length) {
+        window.location.href = `game.html?level=${encodeURIComponent(LEVELS[next].slug)}`;
+      }
+    });
+
+    bus.on(Events.LEVEL_PREV, () => {
+      const prev = this.state.levelIndex - 1;
+      if (prev >= 0) {
+        window.location.href = `game.html?level=${encodeURIComponent(LEVELS[prev].slug)}`;
       }
     });
 
@@ -157,8 +161,7 @@ export class Game {
   reset() {
     this.state.reset(this.connMgr, this.#cssW, this.#cssH);
     this.input.selectedEl = null;
-    this.#winBadge.hidden     = true;
-    this.#nextLevelBtn.hidden = true;
+    this.#sidebar.setWon(false);
 
     this.#elementsLimit = LEVELS[this.state.levelIndex].elementsLimit ?? 0;
     this.#updateCountDisplay();
@@ -175,24 +178,20 @@ export class Game {
     if (!demands.length) return;
     const result = this.connMgr.computeActivePct(this.state.elements);
 
-    const allFlowMet    = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
-    const latencyUnmet  = demands.filter(d =>
+    const allFlowMet   = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
+    const latencyUnmet = demands.filter(d =>
       d.def.requiredLatency != null &&
       (result.latency?.get(d) ?? 0) > d.def.requiredLatency
     );
     const allLatencyMet = latencyUnmet.length === 0;
 
     this.state.won = allFlowMet && allLatencyMet;
-    this.#winBadge.hidden = !this.state.won;
+    this.#sidebar.setWon(this.state.won);
 
     if (this.state.won) {
       this.#setStatus('All demands satisfied.');
-      this.#nextLevelBtn.hidden = this.state.levelIndex >= LEVELS.length - 1;
-    } else {
-      if (allFlowMet && !allLatencyMet) {
-        this.#setStatus('Latency too high — reduce the path length.');
-      }
-      this.#nextLevelBtn.hidden = true;
+    } else if (allFlowMet && !allLatencyMet) {
+      this.#setStatus('Latency too high — reduce the path length.');
     }
   }
 
