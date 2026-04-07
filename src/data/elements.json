@@ -1,4 +1,10 @@
 {
+  "resources": {
+    "WebSite":   { "color": "#79c0ff", "unit": "rps" },
+    "SQL":       { "color": "#56d364", "unit": "qps" },
+    "Storage":   { "color": "#ffa657", "unit": "GB/s" },
+    "MobileAPI": { "color": "#d2a8ff", "unit": "rps" }
+  },
   "WebServer": {
     "label": "Web Server",
     "inputs": { "SQL": { "demand": 30 }, "Storage": { "demand": 5, "multipath": true } },

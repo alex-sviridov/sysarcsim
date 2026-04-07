@@ -14,12 +14,9 @@ export const BEZIER_SAMPLES    = 24;  // sample count for bezier hit-testing
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 1.5;
 
-export const PORT_COLOR = {
-  WebSite:   '#79c0ff',
-  SQL:       '#56d364',
-  Storage:   '#ffa657',
-  MobileAPI: '#d2a8ff',
-};
+// Populated at startup by loadElemDefs() from the resources section of elements.json.
+export const PORT_COLOR = {};
+export const PORT_UNIT  = {};
 
 export const ELEMENTS_API = 'data/elements.json';
 
@@ -29,7 +26,14 @@ export const ELEM_DEFS = {};
 export async function loadElemDefs() {
   const res  = await fetch(ELEMENTS_API);
   const data = await res.json();
-  Object.assign(ELEM_DEFS, data);
+  const { resources, ...elemDefs } = data;
+  if (resources) {
+    for (const [key, spec] of Object.entries(resources)) {
+      PORT_COLOR[key] = spec.color;
+      if (spec.unit != null) PORT_UNIT[key] = spec.unit;
+    }
+  }
+  Object.assign(ELEM_DEFS, elemDefs);
 }
 
 export function inputKeys(def)  { return Object.keys(def.inputs);  }

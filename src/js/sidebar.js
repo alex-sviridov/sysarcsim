@@ -1,4 +1,4 @@
-import { ELEM_DEFS, inputKeys, outputKeys } from './config.js';
+import { ELEM_DEFS, PORT_UNIT, inputKeys, outputKeys } from './config.js';
 import { GameElement } from './element.js';
 import { LEVELS } from './levels.js';
 import { Events } from './event-bus.js';
@@ -54,15 +54,17 @@ export class Sidebar {
       const ioEl = document.createElement('div');
       ioEl.className = 'card-io';
       for (const k of outputKeys(def)) {
+        const unit = PORT_UNIT[k] ? ` ${PORT_UNIT[k]}` : '';
         const span = document.createElement('span');
         span.className   = 'out';
-        span.textContent = `▶ ${k} ${def.outputs[k].supply}`;
+        span.textContent = `▶ ${k} ${def.outputs[k].supply}${unit}`;
         ioEl.appendChild(span);
       }
       for (const k of inputKeys(def)) {
+        const unit = PORT_UNIT[k] ? ` ${PORT_UNIT[k]}` : '';
         const span = document.createElement('span');
         span.className   = 'in';
-        span.textContent = `◀ ${k} ${def.inputs[k].demand}`;
+        span.textContent = `◀ ${k} ${def.inputs[k].demand}${unit}`;
         ioEl.appendChild(span);
       }
 

@@ -1,6 +1,5 @@
 - animation on type mismatch (create red connection, blink, remove it)
 - when not full production power is possible, limit the largest based on the minimal
-- add measurement units
 - add icons to static consumers in level
 - logic for load balancer and other transit elements (no demand)
 - Level specific elements
@@ -9,7 +8,6 @@
 - Element sizing (scale out)
 - Data flow and database sync?
 - add icon to the sidebar cards
-- center on space, move with arrows, zoom in \ out with butons
 - minor bug: no validation for api, everything fails silently
-- move connection (resource) types to api
 - better ui for control panel, elements counter
+- stick to grid option

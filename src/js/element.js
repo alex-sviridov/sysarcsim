@@ -1,4 +1,4 @@
-import { ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_COLOR, inputKeys, outputKeys } from './config.js';
+import { ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_COLOR, PORT_UNIT, inputKeys, outputKeys } from './config.js';
 
 const LATENCY_ROW_H = 22; // extra height reserved for the latency label on demand elements
 
@@ -141,7 +141,8 @@ export class GameElement {
       const connected = connectedInputs.has(i);
       const recv      = computeResult?.received.get(`${this.id}:${i}`) ?? 0;
       const met       = recv >= spec.demand;
-      const label     = `${portKey} ${Math.round(recv)}/${spec.demand}`;
+      const unit      = PORT_UNIT[portKey] ? ` ${PORT_UNIT[portKey]}` : '';
+      const label     = `${portKey} ${Math.round(recv)}/${spec.demand}${unit}`;
 
       ctx.font = '10px monospace';
       ctx.textAlign = 'left';
@@ -198,7 +199,8 @@ export class GameElement {
       const spec    = def.outputs[portKey];
       const col     = PORT_COLOR[portKey] || '#888';
       const flowVal = computeResult?.flow.get(`${this.id}:${i}`) ?? 0;
-      const label   = `${portKey} ${Math.round(flowVal)}/${spec.supply}`;
+      const unit    = PORT_UNIT[portKey] ? ` ${PORT_UNIT[portKey]}` : '';
+      const label   = `${portKey} ${Math.round(flowVal)}/${spec.supply}${unit}`;
 
       ctx.fillStyle = '#8b949e';
       ctx.font = '10px monospace';
