@@ -97,6 +97,12 @@ export class Game {
       this.camera.centerOn(this.state.elements, this.#cssW, this.#cssH);
       this.camera.clamp(this.state.elements, this.#cssW, this.#cssH);
     });
+
+    const btnSnap = document.getElementById('btn-snap-grid');
+    btnSnap.addEventListener('click', () => {
+      this.input.snapToGrid = !this.input.snapToGrid;
+      btnSnap.classList.toggle('active', this.input.snapToGrid);
+    });
   }
 
   // ── Event subscriptions ───────────────────────────────────────────────────

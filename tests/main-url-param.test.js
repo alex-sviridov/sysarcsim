@@ -144,6 +144,7 @@ const nodes = {
   'btn-zoom-in':            makeNode('button'),
   'btn-zoom-out':           makeNode('button'),
   'btn-center':             makeNode('button'),
+  'btn-snap-grid':          makeNode('button'),
 };
 
 global.document = {

@@ -83,6 +83,7 @@ function makeDocumentStub() {
     'btn-zoom-in':            makeNode('button'),
     'btn-zoom-out':           makeNode('button'),
     'btn-center':             makeNode('button'),
+    'btn-snap-grid':          makeNode('button'),
   };
   return {
     _nodes: nodes,

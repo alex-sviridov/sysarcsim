@@ -89,6 +89,7 @@ function makeDocumentStub() {
     'btn-zoom-in':            makeNode('button'),
     'btn-zoom-out':           makeNode('button'),
     'btn-center':             makeNode('button'),
+    'btn-snap-grid':          makeNode('button'),
   };
 
   return {
@@ -858,5 +859,44 @@ describe('action status messages', () => {
     expect(fakeDoc._nodes['status'].dataset.status).toBe('warn');
     LEVELS[0].elementsLimit = LEVELS[0]._origLimit;
     delete LEVELS[0]._origLimit;
+  });
+});
+
+// ── snap-to-grid button ───────────────────────────────────────────────────────
+
+describe('snap-to-grid button', () => {
+  test('btn-snap-grid click toggles input.snapToGrid from false to true', () => {
+    const game = freshGame();
+    expect(game.input.snapToGrid).toBe(false);
+    fakeDoc._nodes['btn-snap-grid']._fire('click');
+    expect(game.input.snapToGrid).toBe(true);
+  });
+
+  test('second click toggles input.snapToGrid back to false', () => {
+    const game = freshGame();
+    fakeDoc._nodes['btn-snap-grid']._fire('click');
+    fakeDoc._nodes['btn-snap-grid']._fire('click');
+    expect(game.input.snapToGrid).toBe(false);
+  });
+
+  test('clicking adds "active" class to button', () => {
+    const game = freshGame();
+    const btn = fakeDoc._nodes['btn-snap-grid'];
+    fakeDoc._nodes['btn-snap-grid']._fire('click');
+    expect(btn.classList.contains('active')).toBe(true);
+  });
+
+  test('clicking again removes "active" class from button', () => {
+    const game = freshGame();
+    const btn = fakeDoc._nodes['btn-snap-grid'];
+    fakeDoc._nodes['btn-snap-grid']._fire('click');
+    fakeDoc._nodes['btn-snap-grid']._fire('click');
+    expect(btn.classList.contains('active')).toBe(false);
+  });
+
+  test('button starts without "active" class', () => {
+    const game = freshGame();
+    const btn = fakeDoc._nodes['btn-snap-grid'];
+    expect(btn.classList.contains('active')).toBe(false);
   });
 });

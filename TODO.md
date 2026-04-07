@@ -9,4 +9,3 @@
 - add icon to the sidebar cards
 - minor bug: no validation for api, everything fails silently
 - better ui for control panel, elements counter
-- stick to grid option

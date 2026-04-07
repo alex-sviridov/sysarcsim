@@ -93,7 +93,7 @@ function makeMockGame({
   return {
     camera: camera ?? makeIdentityCamera(),
     input: {
-      getRenderState: jest.fn(() => ({ state, selectedEl, ghostElem, mx, my })),
+      getRenderState: jest.fn(() => ({ state, selectedEl, ghostElem, mx, my, ghostMx: mx, ghostMy: my })),
     },
     connMgr: {
       connections,

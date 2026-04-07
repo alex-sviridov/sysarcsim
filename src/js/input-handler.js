@@ -1,4 +1,4 @@
-import { PORT_SNAP, REMOVE_HIT_R, inputKeys, outputKeys } from './config.js';
+import { PORT_SNAP, REMOVE_HIT_R, GRID_SIZE, inputKeys, outputKeys } from './config.js';
 import { Events } from './event-bus.js';
 
 
@@ -10,6 +10,7 @@ export class InputHandler {
   //   { mode: 'pan',  sx, sy, camX, camY }
   state      = null;
   selectedEl = null;
+  snapToGrid = false;
 
   #bus;
   #elements;   // reference to game.elements array
@@ -58,12 +59,15 @@ export class InputHandler {
 
   /** Exposes read-only render state to Renderer without leaking internals. */
   getRenderState() {
+    const [gmx, gmy] = this.#snapPlace(this.#mx, this.#my);
     return {
       state:            this.state,
       selectedEl:       this.selectedEl,
       ghostElem:        this.#ghostElem,
       mx:               this.#mx,
       my:               this.#my,
+      ghostMx:          gmx,
+      ghostMy:          gmy,
       hoveredLatencyEl: this.#hoveredLatencyEl,
     };
   }
@@ -94,6 +98,22 @@ export class InputHandler {
         if (this.state?.mode === 'wire') this.state = null;
       }
     });
+  }
+
+  #snapPlace(x, y) {
+    if (!this.snapToGrid) return [x, y];
+    return [
+      Math.round(x / GRID_SIZE) * GRID_SIZE,
+      Math.round(y / GRID_SIZE) * GRID_SIZE,
+    ];
+  }
+
+  #placeElement(x, y, shiftKey) {
+    const [px, py] = this.#snapPlace(x, y);
+    this.#bus.emit(Events.ELEMENT_PLACE, { x: px, y: py, type: this.#pendingType });
+    if (!shiftKey) {
+      this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
+    }
   }
 
   #onDown(e) {
@@ -176,10 +196,7 @@ export class InputHandler {
 
     // Empty space — place pending element or start pan
     if (this.#pendingType) {
-      this.#bus.emit(Events.ELEMENT_PLACE, { x, y, type: this.#pendingType });
-      if (!e.shiftKey) {
-        this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
-      }
+      this.#placeElement(x, y, e.shiftKey);
     } else {
       this.selectedEl = null;
       this.#bus.emit(Events.CONN_SELECT, { conn: null });
@@ -229,8 +246,9 @@ export class InputHandler {
     }
 
     if (this.state?.mode === 'drag') {
-      this.state.elem.x = x - this.state.dx;
-      this.state.elem.y = y - this.state.dy;
+      const [ex, ey] = this.#snapPlace(x - this.state.dx, y - this.state.dy);
+      this.state.elem.x = ex;
+      this.state.elem.y = ey;
       if (this.#dragStartPos && Math.hypot(x - this.#dragStartPos.x, y - this.#dragStartPos.y) > 4) {
         this.#dragMoved = true;
       }
@@ -274,10 +292,7 @@ export class InputHandler {
       const onCanvas = sx >= 0 && sx <= cssW && sy >= 0 && sy <= cssH;
       const hitsElem = this.#elements.some(el => el.hitBody(x, y));
       if (this.#pendingType && onCanvas && !hitsElem) {
-        this.#bus.emit(Events.ELEMENT_PLACE, { x, y, type: this.#pendingType });
-        if (!e.shiftKey) {
-          this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
-        }
+        this.#placeElement(x, y, e.shiftKey);
       } else if (!onCanvas && this.#sidebarDragMoved) {
         this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
       }

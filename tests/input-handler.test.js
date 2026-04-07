@@ -133,7 +133,8 @@ describe('getRenderState', () => {
   test('initial state: { state:null, selectedEl:null, ghostElem:null, mx:0, my:0 }', () => {
     const { handler } = makeSetup();
     expect(handler.getRenderState()).toEqual({
-      state: null, selectedEl: null, ghostElem: null, mx: 0, my: 0, hoveredLatencyEl: null,
+      state: null, selectedEl: null, ghostElem: null,
+      mx: 0, my: 0, ghostMx: 0, ghostMy: 0, hoveredLatencyEl: null,
     });
   });
 
@@ -1055,5 +1056,241 @@ describe('shift-place - sidebar drag release on canvas', () => {
 
     const cleared = fn.mock.calls.some(([d]) => d.type === null);
     expect(cleared).toBe(true);
+  });
+});
+
+// ── snapToGrid ────────────────────────────────────────────────────────────────
+
+const GRID_SIZE = 28;
+
+describe('snapToGrid - default off', () => {
+  test('snapToGrid is false initially', () => {
+    const { handler } = makeSetup();
+    expect(handler.snapToGrid).toBe(false);
+  });
+
+  test('drag without snap: position is exact (not rounded)', () => {
+    const { handler, elements, fireCanvas } = makeSetup();
+
+    const el = makeMockEl(100, 100);
+    el.hitBody.mockReturnValue(true);
+    elements.push(el);
+
+    // Start drag at (150, 130): dx=50, dy=30
+    fireCanvas('mousedown', mouseEvent(150, 130));
+    // Move to (163, 147): el.x = 163-50=113, el.y = 147-30=117 (not on grid)
+    fireDoc('mousemove', mouseEvent(163, 147));
+
+    expect(el.x).toBe(113);
+    expect(el.y).toBe(117);
+  });
+});
+
+describe('snapToGrid - snapping behaviour', () => {
+  test('drag with snap: element x/y round to nearest GRID_SIZE multiple', () => {
+    const { handler, elements, fireCanvas } = makeSetup();
+    handler.snapToGrid = true;
+
+    const el = makeMockEl(100, 100);
+    el.hitBody.mockReturnValue(true);
+    elements.push(el);
+
+    // dx = 150-100=50, dy = 130-100=30
+    fireCanvas('mousedown', mouseEvent(150, 130));
+    // raw x = 163-50=113 → round(113/28)*28 = round(4.04)*28 = 4*28=112
+    // raw y = 147-30=117 → round(117/28)*28 = round(4.18)*28 = 4*28=112
+    fireDoc('mousemove', mouseEvent(163, 147));
+
+    expect(el.x).toBe(Math.round(113 / GRID_SIZE) * GRID_SIZE);
+    expect(el.y).toBe(Math.round(117 / GRID_SIZE) * GRID_SIZE);
+  });
+
+  test('drag with snap: position on exact grid boundary stays unchanged', () => {
+    const { handler, elements, fireCanvas } = makeSetup();
+    handler.snapToGrid = true;
+
+    const el = makeMockEl(0, 0);
+    el.hitBody.mockReturnValue(true);
+    elements.push(el);
+
+    // dx=50, dy=50; move so raw pos = 3*GRID_SIZE exactly
+    const target = 3 * GRID_SIZE + 50;
+    fireCanvas('mousedown', mouseEvent(50, 50));
+    fireDoc('mousemove', mouseEvent(target, target));
+
+    expect(el.x).toBe(3 * GRID_SIZE);
+    expect(el.y).toBe(3 * GRID_SIZE);
+  });
+
+  test('snap=false restores free movement after being enabled', () => {
+    const { handler, elements, fireCanvas } = makeSetup();
+
+    const el = makeMockEl(100, 100);
+    el.hitBody.mockReturnValue(true);
+    elements.push(el);
+
+    // Enable snap, do a drag
+    handler.snapToGrid = true;
+    fireCanvas('mousedown', mouseEvent(150, 130));
+    fireDoc('mousemove', mouseEvent(163, 147));
+    const snappedX = el.x;
+    fireDoc('mouseup', mouseEvent(163, 147));
+
+    // Disable snap, drag again
+    handler.snapToGrid = false;
+    el.hitBody.mockReturnValue(true);
+    fireCanvas('mousedown', mouseEvent(el.x + 50, el.y + 30));
+    fireDoc('mousemove', mouseEvent(el.x + 50 + 13, el.y + 30 + 17));
+
+    // Position should NOT be snapped
+    expect(el.x).toBe(snappedX + 13);
+  });
+
+  test('snap rounds negative coordinates correctly', () => {
+    const { handler, elements, fireCanvas } = makeSetup();
+    handler.snapToGrid = true;
+
+    const el = makeMockEl(0, 0);
+    el.hitBody.mockReturnValue(true);
+    elements.push(el);
+
+    // dx=50, dy=50; raw pos = -15 → round(-15/28)*28 = round(-0.536)*28 = -1*28 = -28
+    fireCanvas('mousedown', mouseEvent(50, 50));
+    fireDoc('mousemove', mouseEvent(35, 35)); // raw = 35-50 = -15
+
+    expect(el.x).toBe(Math.round(-15 / GRID_SIZE) * GRID_SIZE);
+    expect(el.y).toBe(Math.round(-15 / GRID_SIZE) * GRID_SIZE);
+  });
+});
+
+describe('snapToGrid - no effect on wire or pan modes', () => {
+  test('wire mode: snap does not affect state.mx/my (those are cursor positions)', () => {
+    const { handler, elements, fireCanvas } = makeSetup();
+    handler.snapToGrid = true;
+
+    const el = makeMockEl(50, 100);
+    el.hitOutputPort.mockReturnValue(0);
+    elements.push(el);
+
+    fireCanvas('mousedown', mouseEvent(250, 143));
+    fireDoc('mousemove', mouseEvent(400, 300));
+
+    // Wire state.mx/my track raw cursor, not snapped
+    expect(handler.state.mx).toBe(400);
+    expect(handler.state.my).toBe(300);
+  });
+});
+
+// ── snapToGrid - element placement (click-to-place) ───────────────────────────
+
+describe('snapToGrid - click-to-place snapping', () => {
+  test('without snap: ELEMENT_PLACE emitted with exact click coords', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+
+    fireCanvas('mousedown', mouseEvent(163, 147));
+
+    expect(fn.mock.calls[0][0]).toMatchObject({ x: 163, y: 147 });
+  });
+
+  test('with snap: ELEMENT_PLACE emitted with coords snapped to grid', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    handler.snapToGrid = true;
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+
+    // 163 → round(163/28)*28 = round(5.82)*28 = 6*28 = 168
+    // 147 → round(147/28)*28 = round(5.25)*28 = 5*28 = 140
+    fireCanvas('mousedown', mouseEvent(163, 147));
+
+    expect(fn.mock.calls[0][0]).toMatchObject({
+      x: Math.round(163 / GRID_SIZE) * GRID_SIZE,
+      y: Math.round(147 / GRID_SIZE) * GRID_SIZE,
+    });
+  });
+
+  test('with snap: coords already on grid are unchanged', () => {
+    const { handler, bus, fireCanvas } = makeSetup();
+    handler.snapToGrid = true;
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+
+    fireCanvas('mousedown', mouseEvent(4 * GRID_SIZE, 3 * GRID_SIZE));
+
+    expect(fn.mock.calls[0][0]).toMatchObject({ x: 4 * GRID_SIZE, y: 3 * GRID_SIZE });
+  });
+});
+
+// ── snapToGrid - element placement (sidebar drag-release) ─────────────────────
+
+describe('snapToGrid - sidebar drag-release snapping', () => {
+  test('without snap: ELEMENT_PLACE emitted with exact drop coords', () => {
+    const { handler, bus } = makeSetup();
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.emit(Events.SIDEBAR_DRAG_START, {});
+
+    fireDoc('mouseup', mouseEvent(163, 147));
+
+    expect(fn.mock.calls[0][0]).toMatchObject({ x: 163, y: 147 });
+  });
+
+  test('with snap: ELEMENT_PLACE emitted with coords snapped to grid', () => {
+    const { handler, bus } = makeSetup();
+    handler.snapToGrid = true;
+    const fn = jest.fn();
+    bus.on(Events.ELEMENT_PLACE, fn);
+    bus.emit(Events.PENDING_CHANGED, { type: 'WebServer', ghostElem: {} });
+    bus.emit(Events.SIDEBAR_DRAG_START, {});
+
+    fireDoc('mouseup', mouseEvent(163, 147));
+
+    expect(fn.mock.calls[0][0]).toMatchObject({
+      x: Math.round(163 / GRID_SIZE) * GRID_SIZE,
+      y: Math.round(147 / GRID_SIZE) * GRID_SIZE,
+    });
+  });
+});
+
+// ── snapToGrid - ghost element position while dragging ────────────────────────
+
+describe('snapToGrid - ghost position in getRenderState', () => {
+  test('without snap: ghostMx/ghostMy equal raw mx/my', () => {
+    const { handler } = makeSetup();
+    fireDoc('mousemove', mouseEvent(163, 147));
+
+    const { mx, my, ghostMx, ghostMy } = handler.getRenderState();
+    expect(ghostMx).toBe(mx);
+    expect(ghostMy).toBe(my);
+  });
+
+  test('with snap: ghostMx/ghostMy are snapped, mx/my stay raw', () => {
+    const { handler } = makeSetup();
+    handler.snapToGrid = true;
+    fireDoc('mousemove', mouseEvent(163, 147));
+
+    const { mx, my, ghostMx, ghostMy } = handler.getRenderState();
+    expect(mx).toBe(163);
+    expect(my).toBe(147);
+    expect(ghostMx).toBe(Math.round(163 / GRID_SIZE) * GRID_SIZE);
+    expect(ghostMy).toBe(Math.round(147 / GRID_SIZE) * GRID_SIZE);
+  });
+
+  test('with snap: ghost snaps to nearest grid point as mouse moves', () => {
+    const { handler } = makeSetup();
+    handler.snapToGrid = true;
+
+    // 10 → round(10/28)*28 = 0
+    fireDoc('mousemove', mouseEvent(10, 10));
+    expect(handler.getRenderState().ghostMx).toBe(0);
+
+    // 20 → round(20/28)*28 = 28
+    fireDoc('mousemove', mouseEvent(20, 20));
+    expect(handler.getRenderState().ghostMx).toBe(GRID_SIZE);
   });
 });

@@ -35,7 +35,7 @@ export class Renderer {
     if (!W || !H) return;
 
     const cam = game.camera;
-    const { state, selectedEl, ghostElem, mx, my, hoveredLatencyEl } = game.input.getRenderState();
+    const { state, selectedEl, ghostElem, mx, my, ghostMx, ghostMy, hoveredLatencyEl } = game.input.getRenderState();
     const result = game.connMgr.computeActivePct(game.elements);
 
     this.#drawGrid(W, H, cam);
@@ -50,7 +50,7 @@ export class Renderer {
     this.#drawWireInProgress(state);
     this.#drawElements(game.elements, game.connMgr.connections, result, now, hoveredLatencyEl);
     this.#drawSnapIndicator(state, now);
-    this.#drawGhost(ghostElem, mx, my);
+    this.#drawGhost(ghostElem, ghostMx, ghostMy);
 
     ctx.restore();
     // ── Screen-space overlays (not affected by camera) ─────────────────────

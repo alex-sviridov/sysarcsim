@@ -186,6 +186,12 @@ body.level-select-page {
   border-color: #58a6ff;
 }
 
+#viewport-controls button.active {
+  background: #1f6feb;
+  border-color: #58a6ff;
+  color: #fff;
+}
+
 #desk {
   flex: 1;
   min-width: 0;
