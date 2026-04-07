@@ -22,6 +22,9 @@ export class Game {
   get levelIndex()        { return this.state.levelIndex; }
   set levelIndex(v)       { this.state.levelIndex = v; }
 
+  // Test-only: emit an event on the internal bus
+  get _busForTest() { return this.#bus; }
+
   #bus;
   #sidebar;
   #renderer;
@@ -120,27 +123,40 @@ export class Game {
     bus.on(Events.ELEMENT_PLACE, ({ x, y, type }) => {
       const limit = this.#elementsLimit;
       if (limit > 0 && this.#playerCount() >= limit) {
-        this.#bus.emit(Events.SET_STATUS, { msg: 'Element limit reached.', duration: 2000 });
+        this.#bus.emit(Events.SET_STATUS, { msg: 'Element limit reached.', type: 'warn', duration: 2000 });
         return;
       }
       const level  = LEVELS[this.state.levelIndex];
       const merged = level.elements ? { ...ELEM_DEFS, ...level.elements } : ELEM_DEFS;
       this.state.placeElement(x, y, type, merged);
       this.#updateCountDisplay();
+      const label = merged[type]?.label ?? type;
+      this.#setStatus(`Placed ${label}.`);
     });
 
     bus.on(Events.ELEMENT_DELETE, ({ el }) => {
+      const label = el.def.label ?? el.type;
       this.state.deleteElement(el, this.connMgr, this.input);
       this.#updateCountDisplay();
       this.checkWin();
+      if (!this.state.won) this.#setStatus(`Removed ${label}.`);
     });
 
     bus.on(Events.WIRE_COMPLETE, ({ fromElem, fromPort, x, y, snap }) => {
+      const connsBefore = this.connMgr.connections.length;
       this.#completeWire(fromElem, fromPort, x, y, snap);
+      if (this.connMgr.connections.length > connsBefore && !this.state.won) {
+        const newConn   = this.connMgr.connections[this.connMgr.connections.length - 1];
+        const toElem    = this.state.elemMap.get(newConn.toId);
+        const fromLabel = fromElem.def.label ?? fromElem.type;
+        const toLabel   = toElem ? (toElem.def.label ?? toElem.type) : '?';
+        this.#setStatus(`Connected ${fromLabel} → ${toLabel}.`);
+      }
     });
 
     bus.on(Events.CONN_DELETE, ({ conn }) => {
       this.connMgr.delete(conn);
+      if (!this.state.won) this.#setStatus('Disconnected wire.');
     });
 
     bus.on(Events.CONN_SELECT, ({ conn }) => {
@@ -149,7 +165,7 @@ export class Game {
 
     bus.on(Events.CHECK_WIN, () => this.checkWin());
 
-    bus.on(Events.SET_STATUS, ({ msg, duration }) => this.#setStatus(msg, duration));
+    bus.on(Events.SET_STATUS, ({ msg, type, duration }) => this.#setStatus(msg, type, duration));
 
     bus.on(Events.CRITICAL_PATH_CLICK, ({ demandEl }) => {
       const result = this.connMgr.computeActivePct(this.state.elements);
@@ -172,7 +188,7 @@ export class Game {
     this.camera.y    = 0;
     this.camera.zoom = 1;
 
-    this.#setStatus('Connect elements to satisfy the demand.');
+    this.#setStatus('Connect elements to satisfy the demand.', 'info');
   }
 
   checkWin() {
@@ -190,9 +206,9 @@ export class Game {
     this.#sidebar.setWon(this.state.won);
 
     if (this.state.won) {
-      this.#setStatus('All demands satisfied.');
+      this.#setStatus('All demands satisfied.', 'success');
     } else if (allFlowMet && !allLatencyMet) {
-      this.#setStatus('Latency too high — reduce the path length.');
+      this.#setStatus('Latency too high — reduce the path length.', 'warn');
     }
   }
 
@@ -224,12 +240,13 @@ export class Game {
     this.#bus.emit(Events.LIMIT_CHANGED, { count, limit });
   }
 
-  #setStatus(msg, duration) {
+  #setStatus(msg, type = 'info', duration) {
     this.#statusEl.textContent = msg;
+    this.#statusEl.dataset.status = type;
     clearTimeout(this.#statusTimer);
     if (duration) {
       this.#statusTimer = setTimeout(() => {
-        if (!this.state.won) this.#setStatus('Connect elements to satisfy the demand.');
+        if (!this.state.won) this.#setStatus('Connect elements to satisfy the demand.', 'info');
       }, duration);
     }
   }

@@ -11,7 +11,7 @@ export const Events = {
   LEVEL_PREV:      'level:prev',       // {}
   GAME_RESET:      'game:reset',       // {}
   CHECK_WIN:       'game:check-win',   // {}
-  SET_STATUS:      'game:set-status',  // { msg, duration? }
+  SET_STATUS:      'game:set-status',  // { msg, type?: 'info'|'success'|'warn'|'error', duration? }
   LIMIT_CHANGED:        'game:limit-changed',        // { count, limit }
   CRITICAL_PATH_CLICK:  'game:critical-path-click',  // { demandEl }
 };

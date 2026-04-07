@@ -457,6 +457,8 @@ describe('Sidebar elements limit (LIMIT_CHANGED)', () => {
 
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn.mock.calls[0][0].msg).toMatch(/limit/i);
+    expect(fn.mock.calls[0][0].type).toBe('warn');
+    expect(fn.mock.calls[0][0].duration).toBeGreaterThan(0);
   });
 
   test('clicking a disabled card does NOT emit PENDING_CHANGED or SIDEBAR_DRAG_START', () => {

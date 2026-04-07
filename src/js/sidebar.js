@@ -118,7 +118,7 @@ export class Sidebar {
       e.preventDefault();
 
       if (card.classList.contains('card--disabled')) {
-        this.#bus.emit(Events.SET_STATUS, { msg: 'Element limit reached.', duration: 2000 });
+        this.#bus.emit(Events.SET_STATUS, { msg: 'Element limit reached.', type: 'warn', duration: 2000 });
         return;
       }
 

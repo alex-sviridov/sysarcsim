@@ -63,7 +63,7 @@ export class ConnectionManager {
     const toType   = inputKeys(toElem.def)[toPort];
 
     if (fromType !== toType) {
-      this.#bus.emit(Events.SET_STATUS, { msg: `Type mismatch: ${fromType} ≠ ${toType}`, duration: 2500 });
+      this.#bus.emit(Events.SET_STATUS, { msg: `Type mismatch: ${fromType} ≠ ${toType}`, type: 'warn', duration: 2500 });
       return;
     }
 

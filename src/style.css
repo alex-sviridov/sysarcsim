@@ -462,13 +462,30 @@ body.level-select-page {
   display: flex;
   align-items: center;
   padding: 0 16px;
-  gap: 12px;
+  gap: 0;
   flex-shrink: 0;
 }
 
+#controls-left {
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+}
+
+#controls-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 120px;
+}
+
 #elem-count {
-  font-size: 12px;
-  color: #8b949e;
+  font-size: 11px;
+  color: #6e7681;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 2px 8px;
   white-space: nowrap;
 }
 
@@ -478,7 +495,14 @@ body.level-select-page {
   flex: 1;
   font-size: 12px;
   color: #8b949e;
+  text-align: center;
+  transition: color 0.15s;
 }
+
+#status[data-status="success"] { color: #3fb950; }
+#status[data-status="warn"]    { color: #d29922; }
+#status[data-status="error"]   { color: #f85149; }
+#status[data-status="info"]    { color: #8b949e; }
 
 #btn-reset {
   background: #21262d;

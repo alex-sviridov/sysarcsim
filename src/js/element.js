@@ -142,13 +142,14 @@ export class GameElement {
       const recv      = computeResult?.received.get(`${this.id}:${i}`) ?? 0;
       const met       = recv >= spec.demand;
       const unit      = PORT_UNIT[portKey] ? ` ${PORT_UNIT[portKey]}` : '';
-      const label     = `${portKey} ${Math.round(recv)}/${spec.demand}${unit}`;
+      const line2     = `${Math.round(recv)}/${spec.demand}${unit}`;
 
       ctx.font = '10px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = met ? '#56d364' : '#f85149';
-      ctx.fillText(label, x + PORT_R + 6, p.y);
+      ctx.fillText(portKey, x + PORT_R + 6, p.y - 6);
+      ctx.fillText(line2,   x + PORT_R + 6, p.y + 6);
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, PORT_R, 0, Math.PI * 2);
@@ -200,13 +201,14 @@ export class GameElement {
       const col     = PORT_COLOR[portKey] || '#888';
       const flowVal = computeResult?.flow.get(`${this.id}:${i}`) ?? 0;
       const unit    = PORT_UNIT[portKey] ? ` ${PORT_UNIT[portKey]}` : '';
-      const label   = `${portKey} ${Math.round(flowVal)}/${spec.supply}${unit}`;
+      const line2   = `${Math.round(flowVal)}/${spec.supply}${unit}`;
 
       ctx.fillStyle = '#8b949e';
       ctx.font = '10px monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, x + w - PORT_R - 6, p.y);
+      ctx.fillText(portKey, x + w - PORT_R - 6, p.y - 6);
+      ctx.fillText(line2,   x + w - PORT_R - 6, p.y + 6);
 
       ctx.beginPath();
       ctx.arc(p.x, p.y, PORT_R, 0, Math.PI * 2);

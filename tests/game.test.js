@@ -11,6 +11,7 @@ import { GameElement }       from '../src/js/element.js';
 import { ConnectionManager } from '../src/js/connection.js';
 import { ELEM_DEFS, HEADER_H, ROW_H } from '../src/js/config.js';
 import { LEVELS } from '../src/js/levels.js';
+import { Events } from '../src/js/event-bus.js';
 
 // ── Browser global stubs (must be set before Game import) ────────────────
 
@@ -695,5 +696,167 @@ describe('Next Level button navigates to URL', () => {
     game.checkWin();
     // On the last level the button must remain hidden even after winning
     expect(fakeDoc._nodes['btn-next-level'].disabled).toBe(true);
+  });
+});
+
+// ── Status data-status attribute ─────────────────────────────────────────────
+
+describe('status data-status attribute', () => {
+  test('reset sets data-status to "info"', () => {
+    const game = freshGame();
+    game.reset();
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+
+  test('checkWin on win sets data-status to "success"', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('success');
+  });
+
+  test('checkWin with latency unmet sets data-status to "warn"', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      const latency   = new Map();
+      for (const el of elements) { activePct.set(el, 100); latency.set(el, 5); }
+      return { activePct, latency, flow: new Map(), received: new Map() };
+    };
+    for (const el of game.elements) el.def = { ...el.def, requiredLatency: 3 };
+    game.checkWin();
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('warn');
+  });
+
+  test('reset after win reverts data-status to "info"', () => {
+    const game = freshGame();
+    game.connMgr.computeActivePct = (elements) => {
+      const activePct = new Map();
+      for (const el of elements) activePct.set(el, 100);
+      return { activePct, flow: new Map(), received: new Map() };
+    };
+    game.checkWin();
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('success');
+    game.reset();
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+
+  test('status data-status is "info" after game construction', () => {
+    const game = freshGame();
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+});
+
+// ── Action status messages ────────────────────────────────────────────────────
+
+describe('action status messages', () => {
+  test('placing an element sets status to "Placed <label>."', () => {
+    const game = freshGame();
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/placed storage/i);
+  });
+
+  test('placing an element sets data-status to "info"', () => {
+    const game = freshGame();
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+
+  test('deleting an element sets status to "Removed <label>."', () => {
+    const game = freshGame();
+    // Place an element first
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    const placed = game.elements.find(e => !e.def.preset);
+    expect(placed).toBeDefined();
+    game._busForTest.emit(Events.ELEMENT_DELETE, { el: placed });
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/removed storage/i);
+  });
+
+  test('deleting an element sets data-status to "info"', () => {
+    const game = freshGame();
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    const placed = game.elements.find(e => !e.def.preset);
+    game._busForTest.emit(Events.ELEMENT_DELETE, { el: placed });
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+
+  test('completing a wire sets status to "Connected <from> → <to>."', () => {
+    const game = freshGame();
+    // Place Storage and Database so they can be connected
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 100, y: 100, type: 'Storage' });
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 400, y: 100, type: 'Database' });
+    const storage  = game.elements.find(e => e.type === 'Storage');
+    const database = game.elements.find(e => e.type === 'Database');
+
+    game._busForTest.emit(Events.WIRE_COMPLETE, {
+      fromElem: storage, fromPort: 0,
+      x: database.x, y: database.y,
+      snap: { snapElem: database, snapPort: 0, snapValid: true },
+    });
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/connected storage.*database/i);
+  });
+
+  test('completing a wire sets data-status to "info"', () => {
+    const game = freshGame();
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 100, y: 100, type: 'Storage' });
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 400, y: 100, type: 'Database' });
+    const storage  = game.elements.find(e => e.type === 'Storage');
+    const database = game.elements.find(e => e.type === 'Database');
+    game._busForTest.emit(Events.WIRE_COMPLETE, {
+      fromElem: storage, fromPort: 0,
+      x: database.x, y: database.y,
+      snap: { snapElem: database, snapPort: 0, snapValid: true },
+    });
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+
+  test('deleting a connection sets status to "Disconnected wire."', () => {
+    const game = freshGame();
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 100, y: 100, type: 'Storage' });
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 400, y: 100, type: 'Database' });
+    const storage  = game.elements.find(e => e.type === 'Storage');
+    const database = game.elements.find(e => e.type === 'Database');
+    game._busForTest.emit(Events.WIRE_COMPLETE, {
+      fromElem: storage, fromPort: 0,
+      x: database.x, y: database.y,
+      snap: { snapElem: database, snapPort: 0, snapValid: true },
+    });
+    const conn = game.connMgr.connections[0];
+    game._busForTest.emit(Events.CONN_DELETE, { conn });
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/disconnected wire/i);
+  });
+
+  test('deleting a connection sets data-status to "info"', () => {
+    const game = freshGame();
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 100, y: 100, type: 'Storage' });
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 400, y: 100, type: 'Database' });
+    const storage  = game.elements.find(e => e.type === 'Storage');
+    const database = game.elements.find(e => e.type === 'Database');
+    game._busForTest.emit(Events.WIRE_COMPLETE, {
+      fromElem: storage, fromPort: 0,
+      x: database.x, y: database.y,
+      snap: { snapElem: database, snapPort: 0, snapValid: true },
+    });
+    const conn = game.connMgr.connections[0];
+    game._busForTest.emit(Events.CONN_DELETE, { conn });
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('info');
+  });
+
+  test('element limit reached sets status to warn and includes "limit"', () => {
+    LEVELS[0]._origLimit = LEVELS[0].elementsLimit;
+    LEVELS[0].elementsLimit = 1;
+    const game = freshGame();
+    // Fill the limit
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    // Try to place another — should be blocked
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 300, y: 300, type: 'Storage' });
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/limit/i);
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('warn');
+    LEVELS[0].elementsLimit = LEVELS[0]._origLimit;
+    delete LEVELS[0]._origLimit;
   });
 });

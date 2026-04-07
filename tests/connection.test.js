@@ -56,6 +56,8 @@ describe('ConnectionManager.tryConnect', () => {
     expect(mgr.connections).toHaveLength(0);
     expect(statusFn).toHaveBeenCalledTimes(1);
     expect(statusFn.mock.calls[0][0].msg).toMatch(/mismatch/i);
+    expect(statusFn.mock.calls[0][0].type).toBe('warn');
+    expect(statusFn.mock.calls[0][0].duration).toBeGreaterThan(0);
   });
 
   test('does not connect an element to itself', () => {
