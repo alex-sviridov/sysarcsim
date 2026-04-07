@@ -579,3 +579,89 @@ describe('Sidebar nav button state', () => {
     expect(nodes['level-description-popup'].textContent).toBe('Desc A');
   });
 });
+
+describe('Sidebar level-local elements (level.elements)', () => {
+  const LOCAL_DEF = {
+    label: 'Custom Widget',
+    inputs:  { WebSite: { demand: 50 } },
+    outputs: { WebSite: { supply: 50 } },
+    color: '#ff0000',
+    icon: '',
+  };
+
+  const LEVEL_WITH_LOCAL = {
+    slug: 'level-x',
+    title: 'Level X',
+    description: 'Has a local element',
+    demands: [],
+    available: ['CustomWidget'],
+    elements: { CustomWidget: LOCAL_DEF },
+  };
+
+  const LEVEL_OVERRIDE = {
+    slug: 'level-y',
+    title: 'Level Y',
+    description: 'Overrides a global element',
+    demands: [],
+    available: ['WebServer'],
+    elements: {
+      WebServer: {
+        label: 'Custom Web Server',
+        inputs:  {},
+        outputs: { WebSite: { supply: 200 } },
+        color: '#00ff00',
+        icon: '',
+      },
+    },
+  };
+
+  beforeEach(() => {
+    LEVELS.length = 0;
+    LEVELS.push(LEVEL_WITH_LOCAL, LEVEL_OVERRIDE);
+  });
+
+  afterEach(() => {
+    LEVELS.length = 0;
+    LEVELS.push(LEVEL_A, LEVEL_B, LEVEL_C);
+  });
+
+  test('build() creates a card for a level-local type not in ELEM_DEFS', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_WITH_LOCAL);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    expect(cards).toHaveLength(1);
+    expect(cards[0].dataset.type).toBe('CustomWidget');
+  });
+
+  test('card for level-local type uses the local definition label', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_WITH_LOCAL);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const nameEl = cards[0].querySelectorAll('.card-name')[0];
+    expect(nameEl.textContent).toBe('Custom Widget');
+  });
+
+  test('level-local definition overrides global ELEM_DEFS for the same type', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_OVERRIDE);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    expect(cards).toHaveLength(1);
+    const nameEl = cards[0].querySelectorAll('.card-name')[0];
+    expect(nameEl.textContent).toBe('Custom Web Server');
+  });
+
+  test('clicking a level-local card creates a ghost element with the local def', () => {
+    const { sidebar, bus, nodes } = freshSetup();
+    sidebar.build(LEVEL_WITH_LOCAL);
+    const fn = jest.fn();
+    bus.on(Events.PENDING_CHANGED, fn);
+
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const event = makeCardEvent(cards[0]);
+    nodes['sidebar-cards']._fire('mousedown', event);
+
+    const lastCall = fn.mock.calls[fn.mock.calls.length - 1][0];
+    expect(lastCall.type).toBe('CustomWidget');
+    expect(lastCall.ghostElem).not.toBeNull();
+  });
+});

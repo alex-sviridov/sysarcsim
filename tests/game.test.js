@@ -571,10 +571,11 @@ describe('LEVELS data used by Game', () => {
     }
   });
 
-  test('each available type is a valid key in ELEM_DEFS', () => {
+  test('each available type is resolvable via ELEM_DEFS or the level\'s own elements', () => {
     for (const level of LEVELS) {
       for (const type of level.available) {
-        expect(ELEM_DEFS).toHaveProperty(type);
+        const def = level.elements?.[type] ?? ELEM_DEFS[type];
+        expect(def).toBeDefined();
       }
     }
   });

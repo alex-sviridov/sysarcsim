@@ -1,4 +1,4 @@
-import { PORT_COLOR, outputKeys, inputKeys, GRID_SIZE, REMOVE_ICON_R, SNAP_INDICATOR_R, PORT_R } from './config.js';
+import { PORT_COLOR, inputKeys, outputKeys, GRID_SIZE, REMOVE_ICON_R, SNAP_INDICATOR_R, PORT_R } from './config.js';
 import { drawBezier, bezierPoint } from './bezier.js';
 
 const GLOW_DURATION          = 300;   // ms the port glow lasts after a packet arrives
@@ -271,7 +271,7 @@ export class Renderer {
 
   #drawPortGlows(el, now) {
     const ctx = this.#ctx;
-    const inKeys = Object.keys(el.def.inputs);
+    const inKeys = inputKeys(el.def);
     for (let i = 0; i < inKeys.length; i++) {
       const glow = this.#portGlow.get(`${el.id}:${i}`);
       if (!glow) continue;

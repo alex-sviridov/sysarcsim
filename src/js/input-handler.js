@@ -27,8 +27,10 @@ export class InputHandler {
   #sidebarDragging  = false;
   #sidebarDragMoved = false;
 
-  #mx = 0;  // world-space mouse X (for rendering)
-  #my = 0;  // world-space mouse Y (for rendering)
+  #mx  = 0;  // world-space mouse X (for rendering)
+  #my  = 0;  // world-space mouse Y (for rendering)
+  #msx = 0;  // screen-space mouse X (last known)
+  #msy = 0;  // screen-space mouse Y (last known)
 
   constructor(canvas, bus, elements, connMgr, camera) {
     this.canvas    = canvas;
@@ -208,13 +210,14 @@ export class InputHandler {
     const sy = e.clientY - r.top;
     const { x, y } = this.#cam.toWorld(sx, sy);
 
-    if (this.#sidebarDragging && Math.hypot(sx - this.#cam.toScreen(this.#mx, this.#my).x,
-                                             sy - this.#cam.toScreen(this.#mx, this.#my).y) > 4) {
+    if (this.#sidebarDragging && Math.hypot(sx - this.#msx, sy - this.#msy) > 4) {
       this.#sidebarDragMoved = true;
     }
 
-    this.#mx = x;
-    this.#my = y;
+    this.#mx  = x;
+    this.#my  = y;
+    this.#msx = sx;
+    this.#msy = sy;
     this.#hoveredLatencyEl = this.#elements.find(el => el.hitLatencyLabel(x, y)) ?? null;
 
     if (this.state?.mode === 'pan') {

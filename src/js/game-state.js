@@ -55,6 +55,7 @@ export class GameState {
       input.state = null;
     }
     connMgr.deleteConnectedTo(el);
+    // Must use splice (not filter) — InputHandler holds a stable reference to this array.
     this.elements.splice(this.elements.indexOf(el), 1);
     this.elemMap.delete(el.id);
     if (input.selectedEl === el) input.selectedEl = null;

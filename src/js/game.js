@@ -123,7 +123,9 @@ export class Game {
         this.#bus.emit(Events.SET_STATUS, { msg: 'Element limit reached.', duration: 2000 });
         return;
       }
-      this.state.placeElement(x, y, type, ELEM_DEFS);
+      const level  = LEVELS[this.state.levelIndex];
+      const merged = level.elements ? { ...ELEM_DEFS, ...level.elements } : ELEM_DEFS;
+      this.state.placeElement(x, y, type, merged);
       this.#updateCountDisplay();
     });
 
@@ -178,12 +180,11 @@ export class Game {
     if (!demands.length) return;
     const result = this.connMgr.computeActivePct(this.state.elements);
 
-    const allFlowMet   = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
-    const latencyUnmet = demands.filter(d =>
-      d.def.requiredLatency != null &&
-      (result.latency?.get(d) ?? 0) > d.def.requiredLatency
+    const allFlowMet    = demands.every(d => (result.activePct.get(d) ?? 0) >= 100);
+    const allLatencyMet = demands.every(d =>
+      d.def.requiredLatency == null ||
+      (result.latency?.get(d) ?? 0) <= d.def.requiredLatency
     );
-    const allLatencyMet = latencyUnmet.length === 0;
 
     this.state.won = allFlowMet && allLatencyMet;
     this.#sidebar.setWon(this.state.won);
@@ -204,10 +205,10 @@ export class Game {
   }
 
   #completeWire(fromElem, fromPort, x, y, snap) {
-    if (snap?.snapValid !== false) {
-      const target = snap ?? this.#hitInputPort(x, y);
-      if (target) this.connMgr.tryConnect(fromElem, fromPort, target.snapElem, target.snapPort);
-    }
+    const target = snap?.snapValid ? snap
+                 : snap == null    ? this.#hitInputPort(x, y)
+                 : null; // snap exists but is invalid (type mismatch) — reject
+    if (target) this.connMgr.tryConnect(fromElem, fromPort, target.snapElem, target.snapPort);
   }
 
   #playerCount() {

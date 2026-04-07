@@ -34,7 +34,7 @@ export class Sidebar {
     container.innerHTML = '';
 
     for (const type of level.available) {
-      const def  = ELEM_DEFS[type];
+      const def  = this.#resolveDef(type);
       const card = document.createElement('div');
       card.className    = 'card';
       card.dataset.type = type;
@@ -92,6 +92,10 @@ export class Sidebar {
     nextBtn.classList.toggle('btn-next--ready', won && !isLast);
   }
 
+  #resolveDef(type) {
+    return this.#currentLevel?.elements?.[type] ?? ELEM_DEFS[type];
+  }
+
   clearPending() {
     this.#pendingType = null;
     this.#ghostElem   = null;
@@ -124,7 +128,7 @@ export class Sidebar {
       } else {
         this.clearPending();
         this.#pendingType = type;
-        this.#ghostElem   = new GameElement(type, 0, 0, ELEM_DEFS[type]);
+        this.#ghostElem   = new GameElement(type, 0, 0, this.#resolveDef(type));
         card.classList.add('card--active');
         this.#bus.emit(Events.PENDING_CHANGED, { type, ghostElem: this.#ghostElem });
         this.#bus.emit(Events.SIDEBAR_DRAG_START, {});

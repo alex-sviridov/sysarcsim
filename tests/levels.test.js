@@ -173,12 +173,62 @@ describe('Level 2 specifics', () => {
 });
 
 describe('Available types cross-reference ELEM_DEFS', () => {
-  test('every available type in every level exists in ELEM_DEFS', () => {
+  test('every available type in every level is resolvable via ELEM_DEFS or level.elements', () => {
     for (const level of LEVELS) {
       for (const type of level.available) {
-        expect(ELEM_DEFS).toHaveProperty(type);
+        const def = level.elements?.[type] ?? ELEM_DEFS[type];
+        expect(def).toBeDefined();
       }
     }
+  });
+});
+
+describe('Level-specific elements (level.elements)', () => {
+  test('level-3 has an elements object', () => {
+    const level3 = LEVELS.find(l => l.slug === 'level-3');
+    expect(level3.elements).toBeDefined();
+    expect(typeof level3.elements).toBe('object');
+  });
+
+  test('level-3 elements contains WAF', () => {
+    const level3 = LEVELS.find(l => l.slug === 'level-3');
+    expect(level3.elements).toHaveProperty('WAF');
+  });
+
+  test('level-3 WAF definition has required fields: label, inputs, outputs, color, icon', () => {
+    const waf = LEVELS.find(l => l.slug === 'level-3').elements.WAF;
+    expect(typeof waf.label).toBe('string');
+    expect(typeof waf.inputs).toBe('object');
+    expect(typeof waf.outputs).toBe('object');
+    expect(typeof waf.color).toBe('string');
+    expect(typeof waf.icon).toBe('string');
+  });
+
+  test('level-3 WAF has WebSite input with demand 100', () => {
+    const waf = LEVELS.find(l => l.slug === 'level-3').elements.WAF;
+    expect(waf.inputs).toHaveProperty('WebSite');
+    expect(waf.inputs.WebSite.demand).toBe(100);
+  });
+
+  test('level-3 WAF has WebSite output with supply 100', () => {
+    const waf = LEVELS.find(l => l.slug === 'level-3').elements.WAF;
+    expect(waf.outputs).toHaveProperty('WebSite');
+    expect(waf.outputs.WebSite.supply).toBe(100);
+  });
+
+  test('level-3 WAF has a positive latency', () => {
+    const waf = LEVELS.find(l => l.slug === 'level-3').elements.WAF;
+    expect(typeof waf.latency).toBe('number');
+    expect(waf.latency).toBeGreaterThan(0);
+  });
+
+  test('WAF is NOT in global ELEM_DEFS', () => {
+    expect(ELEM_DEFS).not.toHaveProperty('WAF');
+  });
+
+  test('levels 1 and 2 do not have an elements object', () => {
+    expect(LEVELS[0].elements).toBeUndefined();
+    expect(LEVELS[1].elements).toBeUndefined();
   });
 });
 

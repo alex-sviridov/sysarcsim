@@ -144,11 +144,15 @@ export class ConnectionManager {
     const received  = new Map(); // `${elemId}:${portIdx}` → received at input
     const latency   = new Map(); // GameElement → cumulative max-path latency
 
-    const connsByPort = new Map(); // `${fromId}:${fromPort}` → Connection[]
+    const connsByPort  = new Map(); // `${fromId}:${fromPort}` → Connection[]
+    const connsByToId  = new Map(); // toId → Connection[]
     for (const c of this.connections) {
-      const key = `${c.fromId}:${c.fromPort}`;
-      if (!connsByPort.has(key)) connsByPort.set(key, []);
-      connsByPort.get(key).push(c);
+      const outKey = `${c.fromId}:${c.fromPort}`;
+      if (!connsByPort.has(outKey)) connsByPort.set(outKey, []);
+      connsByPort.get(outKey).push(c);
+
+      if (!connsByToId.has(c.toId)) connsByToId.set(c.toId, []);
+      connsByToId.get(c.toId).push(c);
     }
 
     for (const el of sorted) {
@@ -159,12 +163,9 @@ export class ConnectionManager {
       const ownLatency = isConsumer ? 0 : (el.def.latency ?? 1);
 
       let maxUpstream = 0;
-      for (const c of this.connections) {
-        if (c.toId !== el.id) continue;
-        const fromEl = elemById.get(c.fromId);
-        if (!fromEl) continue;
-        const upstreamLatency = latency.get(fromEl) ?? 0;
-        if (upstreamLatency > maxUpstream) maxUpstream = upstreamLatency;
+      for (const c of connsByToId.get(el.id) ?? []) {
+        const upLat = latency.get(elemById.get(c.fromId)) ?? 0;
+        if (upLat > maxUpstream) maxUpstream = upLat;
       }
       latency.set(el, maxUpstream + ownLatency);
 
@@ -193,10 +194,11 @@ export class ConnectionManager {
           const toEl = elemById.get(c.toId);
           if (!toEl) continue;
           const toSpec     = toEl.def.inputs[inputKeys(toEl.def)[c.toPort]];
-          const alreadyGot = received.get(`${c.toId}:${c.toPort}`) ?? 0;
+          const recvKey    = `${c.toId}:${c.toPort}`;
+          const alreadyGot = received.get(recvKey) ?? 0;
           const stillNeeds = toSpec ? Math.max(0, toSpec.demand - alreadyGot) : 0;
           const give       = Math.min(pool, stillNeeds);
-          received.set(`${c.toId}:${c.toPort}`, (received.get(`${c.toId}:${c.toPort}`) ?? 0) + give);
+          received.set(recvKey, alreadyGot + give);
           connRatio.set(c.id, capacity > 0 ? give / capacity : 0);
           pool           -= give;
           totalAllocated += give;
@@ -215,14 +217,19 @@ export class ConnectionManager {
     const elemIds = new Set();
     const connIds = new Set();
 
+    // Index incoming connections by destination for O(1) lookup per walk step
+    const connsByToId = new Map();
+    for (const c of this.connections) {
+      if (!connsByToId.has(c.toId)) connsByToId.set(c.toId, []);
+      connsByToId.get(c.toId).push(c);
+    }
+
     const walk = (el) => {
       elemIds.add(el.id);
-      // Find the incoming connection from the upstream element with the highest latency
       let bestConn     = null;
       let bestUpstream = null;
       let bestLatency  = -1;
-      for (const c of this.connections) {
-        if (c.toId !== el.id) continue;
+      for (const c of connsByToId.get(el.id) ?? []) {
         const fromEl = this.#elemMap.get(c.fromId);
         if (!fromEl) continue;
         const upLat = latencyMap.get(fromEl) ?? 0;
