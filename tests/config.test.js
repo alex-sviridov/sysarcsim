@@ -1,9 +1,17 @@
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
 import {
   ELEM_W, HEADER_H, ROW_H, PORT_R, PORT_HIT, PORT_SNAP,
   GRID_SIZE, REMOVE_ICON_R, REMOVE_HIT_R, SNAP_INDICATOR_R, BEZIER_SAMPLES,
   PORT_COLOR, PORT_UNIT, ELEM_DEFS, loadElemDefs,
   inputKeys, outputKeys,
 } from '../src/js/config.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const RAW = JSON.parse(readFileSync(resolve(__dirname, '../src/data/elements.json'), 'utf8'));
+const RAW_RESOURCES = RAW.resources ?? {};
 
 // ── Numeric constants ──────────────────────────────────────────────────────
 
@@ -44,15 +52,13 @@ describe('loadElemDefs — resource colors', () => {
     expect(ELEM_DEFS).not.toHaveProperty('resources');
   });
 
-  test('loadElemDefs re-populates PORT_COLOR from elements.json resources section', async () => {
-    // Clear and reload to verify the dynamic path
+  test('loadElemDefs re-populates PORT_COLOR to match elements.json resources', async () => {
     for (const k of Object.keys(PORT_COLOR)) delete PORT_COLOR[k];
     for (const k of Object.keys(ELEM_DEFS))  delete ELEM_DEFS[k];
     await loadElemDefs();
-    expect(PORT_COLOR.WebSite).toBe('#79c0ff');
-    expect(PORT_COLOR.SQL).toBe('#56d364');
-    expect(PORT_COLOR.Storage).toBe('#ffa657');
-    expect(PORT_COLOR.MobileAPI).toBe('#d2a8ff');
+    for (const [key, spec] of Object.entries(RAW_RESOURCES)) {
+      expect(PORT_COLOR[key]).toBe(spec.color);
+    }
   });
 
   test('loadElemDefs does not bleed resources into ELEM_DEFS', async () => {
@@ -105,15 +111,18 @@ describe('PORT_UNIT', () => {
     }
   });
 
-  test('loadElemDefs re-populates PORT_UNIT from elements.json resources section', async () => {
+  test('loadElemDefs re-populates PORT_UNIT to match elements.json resources', async () => {
     for (const k of Object.keys(PORT_COLOR)) delete PORT_COLOR[k];
     for (const k of Object.keys(PORT_UNIT))  delete PORT_UNIT[k];
     for (const k of Object.keys(ELEM_DEFS))  delete ELEM_DEFS[k];
     await loadElemDefs();
-    expect(PORT_UNIT.WebSite).toBe('rps');
-    expect(PORT_UNIT.SQL).toBe('qps');
-    expect(PORT_UNIT.Storage).toBe('GB/s');
-    expect(PORT_UNIT.MobileAPI).toBe('rps');
+    for (const [key, spec] of Object.entries(RAW_RESOURCES)) {
+      if (spec.unit != null) {
+        expect(PORT_UNIT[key]).toBe(spec.unit);
+      } else {
+        expect(PORT_UNIT).not.toHaveProperty(key);
+      }
+    }
   });
 
   test('resource without unit field is absent from PORT_UNIT (optional)', async () => {
@@ -144,10 +153,11 @@ describe('PORT_UNIT', () => {
 // ── PORT_COLOR ─────────────────────────────────────────────────────────────
 
 describe('PORT_COLOR', () => {
-  test('defines WebSite color', () => expect(PORT_COLOR.WebSite).toBe('#79c0ff'));
-  test('defines SQL color', () => expect(PORT_COLOR.SQL).toBe('#56d364'));
-  test('defines Storage color', () => expect(PORT_COLOR.Storage).toBe('#ffa657'));
-  test('defines MobileAPI color', () => expect(PORT_COLOR.MobileAPI).toBe('#d2a8ff'));
+  test('each resource color matches elements.json', () => {
+    for (const [key, spec] of Object.entries(RAW_RESOURCES)) {
+      expect(PORT_COLOR[key]).toBe(spec.color);
+    }
+  });
   test('all colors are valid hex strings', () => {
     for (const color of Object.values(PORT_COLOR)) {
       expect(color).toMatch(/^#[0-9a-f]{6}$/i);

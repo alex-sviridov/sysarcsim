@@ -52,7 +52,8 @@
     "title": "Level 3 — Under Attack",
     "description": "Traffic is surging and bad actors are probing your service. Secure your web frontend without breaking mobile access, and keep latency low.",
     "hint": "A WAF can filter malicious web traffic — place it between your users and the web server. Mobile traffic bypasses the WAF but still needs its own gateway.",
-    "elementsLimit": 0,
+    "elementsLimit": 4,
+    "budgetLimit": 600,
     "demands": [
       {
         "type":    "WebUser",
@@ -78,6 +79,7 @@
     "elements": {
       "WAF": {
         "label": "Web Application Firewall",
+        "price": 150,
         "inputs":  { "WebSite": { "demand": 100 } },
         "outputs": { "WebSite": { "supply": 100 } },
         "color": "#d73a49",

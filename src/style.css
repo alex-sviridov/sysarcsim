@@ -382,6 +382,11 @@ body.level-select-page {
   color: #e6edf3;
 }
 
+.card-price {
+  font-size: 11px;
+  color: #8b949e;
+}
+
 .card-io {
   display: flex;
   flex-wrap: wrap;
@@ -475,6 +480,7 @@ body.level-select-page {
 #controls-left {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-width: 120px;
 }
 
@@ -496,6 +502,28 @@ body.level-select-page {
 }
 
 #elem-count:empty { display: none; }
+
+#budget-count {
+  font-size: 11px;
+  color: #6e7681;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+#budget-count:empty { display: none; }
+
+@keyframes budget-flash {
+  0%   { color: #f0883e; border-color: #f0883e; background: #2a1a08; }
+  60%  { color: #f0883e; border-color: #f0883e; background: #2a1a08; }
+  100% { color: #6e7681; border-color: #30363d; background: #21262d; }
+}
+
+#budget-count.budget-flash {
+  animation: budget-flash 0.6s ease-out forwards;
+}
 
 #status {
   flex: 1;

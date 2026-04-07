@@ -31,15 +31,18 @@ export class Game {
   #statusTimer  = null;
   #statusEl;
   #elemCountEl;
+  #budgetCountEl;
   #elementsLimit = 0;
+  #budgetLimit   = 0;
   #cssW = 0;
   #cssH = 0;
   #boundLoop;
 
   constructor(startIndex = 0) {
     this.canvas       = document.getElementById('desk');
-    this.#statusEl    = document.getElementById('status');
-    this.#elemCountEl = document.getElementById('elem-count');
+    this.#statusEl      = document.getElementById('status');
+    this.#elemCountEl   = document.getElementById('elem-count');
+    this.#budgetCountEl = document.getElementById('budget-count');
 
     this.#bus      = new EventBus();
     this.connMgr   = new ConnectionManager(this.state.elemMap, this.#bus);
@@ -134,8 +137,18 @@ export class Game {
       }
       const level  = LEVELS[this.state.levelIndex];
       const merged = level.elements ? { ...ELEM_DEFS, ...level.elements } : ELEM_DEFS;
+      const budgetLimit = this.#budgetLimit;
+      if (budgetLimit > 0) {
+        const price = merged[type]?.price ?? 0;
+        if (this.#spentBudget(merged) + price > budgetLimit) {
+          this.#bus.emit(Events.SET_STATUS, { msg: 'Budget limit reached.', type: 'warn', duration: 2000 });
+          return;
+        }
+      }
+      const pricePaid = merged[type]?.price ?? 0;
       this.state.placeElement(x, y, type, merged);
       this.#updateCountDisplay();
+      if (pricePaid > 0) this.#animateBudget();
       const label = merged[type]?.label ?? type;
       this.#setStatus(`Placed ${label}.`);
     });
@@ -188,6 +201,7 @@ export class Game {
     this.#sidebar.setWon(false);
 
     this.#elementsLimit = LEVELS[this.state.levelIndex].elementsLimit ?? 0;
+    this.#budgetLimit   = LEVELS[this.state.levelIndex].budgetLimit   ?? 0;
     this.#updateCountDisplay();
 
     this.camera.x    = 0;
@@ -237,13 +251,37 @@ export class Game {
     return this.state.elements.filter(e => !e.def.preset).length;
   }
 
+  #spentBudget(merged) {
+    return this.state.elements
+      .filter(e => !e.def.preset)
+      .reduce((sum, e) => sum + (merged[e.type]?.price ?? 0), 0);
+  }
+
   #updateCountDisplay() {
     const count = this.#playerCount();
     const limit = this.#elementsLimit;
     this.#elemCountEl.textContent = limit > 0
       ? `${count}/${limit} elements`
       : `${count} element${count !== 1 ? 's' : ''}`;
+
+    const budgetLimit = this.#budgetLimit;
+    const level  = LEVELS[this.state.levelIndex];
+    const merged = level.elements ? { ...ELEM_DEFS, ...level.elements } : ELEM_DEFS;
+    const spent  = this.#spentBudget(merged);
+    if (budgetLimit > 0) {
+      this.#budgetCountEl.textContent = `$${spent.toLocaleString()}/$${budgetLimit.toLocaleString()} budget`;
+    } else {
+      this.#budgetCountEl.textContent = spent > 0 ? `$${spent.toLocaleString()} spent` : '';
+    }
+
     this.#bus.emit(Events.LIMIT_CHANGED, { count, limit });
+  }
+
+  #animateBudget() {
+    const el = this.#budgetCountEl;
+    el.classList.remove('budget-flash');
+    void el.offsetWidth; // reflow to restart animation
+    el.classList.add('budget-flash');
   }
 
   #setStatus(msg, type = 'info', duration) {

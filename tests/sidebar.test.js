@@ -667,3 +667,85 @@ describe('Sidebar level-local elements (level.elements)', () => {
     expect(lastCall.ghostElem).not.toBeNull();
   });
 });
+
+describe('Sidebar card price display', () => {
+  const PRICED_DEF = {
+    label: 'Priced Widget',
+    price: 7,
+    inputs:  {},
+    outputs: { WebSite: { supply: 10 } },
+    color: '#ff0000',
+    icon: '',
+  };
+  const FREE_DEF = {
+    label: 'Free Widget',
+    inputs:  {},
+    outputs: { WebSite: { supply: 10 } },
+    color: '#00ff00',
+    icon: '',
+  };
+
+  const LEVEL_PRICED = {
+    slug: 'level-priced',
+    title: 'Level Priced',
+    description: '',
+    demands: [],
+    available: ['PricedWidget'],
+    elements: { PricedWidget: PRICED_DEF },
+  };
+  const LEVEL_FREE = {
+    slug: 'level-free',
+    title: 'Level Free',
+    description: '',
+    demands: [],
+    available: ['FreeWidget'],
+    elements: { FreeWidget: FREE_DEF },
+  };
+
+  beforeEach(() => {
+    LEVELS.length = 0;
+    LEVELS.push(LEVEL_PRICED, LEVEL_FREE);
+  });
+
+  afterEach(() => {
+    LEVELS.length = 0;
+    LEVELS.push(LEVEL_A, LEVEL_B, LEVEL_C);
+  });
+
+  test('card for priced element contains a .card-price child', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_PRICED);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const priceEls = cards[0].querySelectorAll('.card-price');
+    expect(priceEls).toHaveLength(1);
+  });
+
+  test('.card-price text content is "$<price>"', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_PRICED);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const priceEl = cards[0].querySelectorAll('.card-price')[0];
+    expect(priceEl.textContent).toBe('$7');
+  });
+
+  test('card for free element (no price field) has no .card-price child', () => {
+    const { sidebar, nodes } = freshSetup();
+    sidebar.build(LEVEL_FREE);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const priceEls = cards[0].querySelectorAll('.card-price');
+    expect(priceEls).toHaveLength(0);
+  });
+
+  test('WebServer card (price defined in elements.json) has .card-price', () => {
+    const { sidebar, nodes } = freshSetup();
+    LEVELS.length = 0;
+    LEVELS.push(LEVEL_A); // LEVEL_A has WebServer and Database, both priced
+    sidebar.build(LEVEL_A);
+    const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
+    const wsCard = cards.find(c => c.dataset.type === 'WebServer');
+    expect(wsCard).toBeDefined();
+    const priceEls = wsCard.querySelectorAll('.card-price');
+    expect(priceEls).toHaveLength(1);
+    expect(priceEls[0].textContent).toBe(`$${ELEM_DEFS['WebServer'].price}`);
+  });
+});

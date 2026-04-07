@@ -129,6 +129,7 @@ const nodes = {
   'desk':           makeNode('canvas'),
   'status':         makeNode(),
   'elem-count':     makeNode(),
+  'budget-count':   makeNode(),
   'win-badge':              makeNode(),
   'btn-next-level':         makeNode('button'),
   'btn-prev-level':         makeNode('button'),

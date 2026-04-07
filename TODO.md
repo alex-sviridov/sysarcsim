@@ -2,8 +2,6 @@
 - when not full production power is possible, limit the largest based on the minimal
 - add icons to static consumers in level
 - logic for load balancer and other transit elements (no demand)
-- Budget in level definition
-- Element price
 - Element sizing (scale out)
 - Data flow and database sync?
 - add icon to the sidebar cards

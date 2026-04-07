@@ -2,11 +2,12 @@
   "resources": {
     "WebSite":   { "color": "#79c0ff", "unit": "rps" },
     "SQL":       { "color": "#56d364", "unit": "qps" },
-    "Storage":   { "color": "#ffa657", "unit": "GB/s" },
+    "Storage":   { "color": "#ffa657", "unit": "iops" },
     "MobileAPI": { "color": "#d2a8ff", "unit": "rps" }
   },
   "WebServer": {
     "label": "Web Server",
+    "price": 120,
     "inputs": { "SQL": { "demand": 30 }, "Storage": { "demand": 5, "multipath": true } },
     "outputs": { "WebSite": { "supply": 100 } },
     "color": "#1f6feb",
@@ -14,6 +15,7 @@
   },
   "APIGateway": {
     "label": "API Gateway",
+    "price": 80,
     "inputs": { "SQL": { "demand": 10 } },
     "outputs": { "MobileAPI": { "supply": 80 } },
     "color": "#8957e5",
@@ -21,6 +23,7 @@
   },
   "Database": {
     "label": "Database",
+    "price": 200,
     "inputs": { "Storage": { "demand": 85, "multipath": true } },
     "outputs": { "SQL": { "supply": 50 } },
     "color": "#388bfd",
@@ -28,6 +31,7 @@
   },
   "Storage": {
     "label": "Storage",
+    "price": 50,
     "inputs": {},
     "outputs": { "Storage": { "supply": 50 } },
     "color": "#f0883e",

@@ -74,6 +74,7 @@ function makeDocumentStub() {
     'desk':                   makeNode('canvas'),
     'status':                 makeNode(),
     'elem-count':             makeNode(),
+    'budget-count':           makeNode(),
     'win-badge':              makeNode(),
     'btn-next-level':         makeNode('button'),
     'btn-prev-level':         makeNode('button'),
@@ -859,6 +860,121 @@ describe('action status messages', () => {
     expect(fakeDoc._nodes['status'].dataset.status).toBe('warn');
     LEVELS[0].elementsLimit = LEVELS[0]._origLimit;
     delete LEVELS[0]._origLimit;
+  });
+});
+
+// ── budget limit ─────────────────────────────────────────────────────────────
+
+describe('budget limit', () => {
+  // Helper: set a budget limit on LEVELS[0] and return a fresh game.
+  function gameWithBudget(limit) {
+    GameElement.resetCounter();
+    ConnectionManager.resetCounter();
+    resetFakeDoc();
+    fakeDoc._nodes['budget-count'].textContent = '';
+    const game = new Game();
+    LEVELS[0]._origBudget = LEVELS[0].budgetLimit;
+    LEVELS[0].budgetLimit = limit;
+    game.levelIndex = 0;
+    game.reset();
+    return game;
+  }
+
+  afterEach(() => {
+    if (LEVELS[0]._origBudget !== undefined) {
+      LEVELS[0].budgetLimit = LEVELS[0]._origBudget;
+      delete LEVELS[0]._origBudget;
+    }
+  });
+
+  test('budget-count shows spent/limit after reset when budget is set', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const limit = storagePrice * 3;
+    gameWithBudget(limit);
+    expect(fakeDoc._nodes['budget-count'].textContent).toMatch(new RegExp(`\\$0\\/\\$${limit} budget`));
+  });
+
+  test('budget-count is empty when budget is unlimited (0)', () => {
+    gameWithBudget(0);
+    expect(fakeDoc._nodes['budget-count'].textContent).toBe('');
+  });
+
+  test('budget-count updates after placing an element with a price', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const limit = storagePrice * 3;
+    const game = gameWithBudget(limit);
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    expect(fakeDoc._nodes['budget-count'].textContent)
+      .toMatch(new RegExp(`\\$${storagePrice}\\/\\$${limit} budget`));
+  });
+
+  test('budget-count updates after deleting a placed element', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const limit = storagePrice * 3;
+    const game = gameWithBudget(limit);
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    const placed = game.elements.find(e => !e.def.preset);
+    game._busForTest.emit(Events.ELEMENT_DELETE, { el: placed });
+    expect(fakeDoc._nodes['budget-count'].textContent).toMatch(new RegExp(`\\$0\\/\\$${limit} budget`));
+  });
+
+  test('placing an element whose price would exceed the budget is blocked', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const game = gameWithBudget(storagePrice - 1);
+    const before = game.elements.length;
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    expect(game.elements.length).toBe(before);
+  });
+
+  test('blocked placement sets status to warn with "budget" in the message', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const game = gameWithBudget(storagePrice - 1);
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    expect(fakeDoc._nodes['status'].textContent).toMatch(/budget/i);
+    expect(fakeDoc._nodes['status'].dataset.status).toBe('warn');
+  });
+
+  test('placing a free element (no price) is not blocked even when budget is 0', () => {
+    // Add a free element type temporarily
+    ELEM_DEFS['FreeNode'] = {
+      label: 'Free Node', price: undefined,
+      inputs: {}, outputs: { WebSite: { supply: 10 } }, color: '#fff', icon: '',
+    };
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const game = gameWithBudget(storagePrice - 1); // tight budget: can't afford Storage
+    const before = game.elements.length;
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'FreeNode' });
+    expect(game.elements.length).toBe(before + 1);
+    delete ELEM_DEFS['FreeNode'];
+  });
+
+  test('cumulative cost of multiple elements is tracked correctly', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const limit = storagePrice * 3;
+    const game = gameWithBudget(limit);
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 100, y: 100, type: 'Storage' });
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 100, type: 'Storage' });
+    expect(fakeDoc._nodes['budget-count'].textContent)
+      .toMatch(new RegExp(`\\$${storagePrice * 2}\\/\\$${limit} budget`));
+  });
+
+  test('budget-count resets to 0 after game.reset()', () => {
+    const storagePrice = ELEM_DEFS['Storage'].price ?? 0;
+    const limit = storagePrice * 3;
+    const game = gameWithBudget(limit);
+    game._busForTest.emit(Events.ELEMENT_PLACE, { x: 200, y: 200, type: 'Storage' });
+    game.reset();
+    expect(fakeDoc._nodes['budget-count'].textContent).toMatch(new RegExp(`\\$0\\/\\$${limit} budget`));
+  });
+
+  test('LEVELS data: budgetLimit is a non-negative integer or undefined for every level', () => {
+    for (const level of LEVELS) {
+      if (level.budgetLimit !== undefined) {
+        expect(typeof level.budgetLimit).toBe('number');
+        expect(Number.isInteger(level.budgetLimit)).toBe(true);
+        expect(level.budgetLimit).toBeGreaterThan(0);
+      }
+    }
   });
 });
 

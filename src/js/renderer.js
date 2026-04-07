@@ -262,10 +262,10 @@ export class Renderer {
       connMap.get(c.toId).add(c.toPort);
     }
     for (const el of elements) {
+      this.#drawCriticalPathBorder(el, now);
       el.draw(this.#ctx, connMap.get(el.id) || new Set(), result.activePct.get(el) ?? 0, result, el === hoveredLatencyEl, now);
       this.#drawPortGlows(el, now);
       this.#drawStarvedPorts(el, result, now);
-      this.#drawCriticalPathBorder(el, now);
     }
   }
 

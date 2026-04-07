@@ -131,6 +131,15 @@ export class GameElement {
       ctx.fillText(def.label, x + w / 2, y + HEADER_H / 2);
     }
 
+    // Price tag (top-right of header, only for non-preset elements with a price)
+    if (!def.preset && def.price != null) {
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.fillText(`$${def.price}`, x + w - 5, y + HEADER_H / 2);
+    }
+
     // Input ports (left side)
     const inKeys = inputKeys(def);
     for (let i = 0; i < inKeys.length; i++) {

@@ -69,6 +69,12 @@ export class Sidebar {
       }
 
       card.appendChild(nameEl);
+      if (def.price != null) {
+        const priceEl = document.createElement('div');
+        priceEl.className   = 'card-price';
+        priceEl.textContent = `$${def.price}`;
+        card.appendChild(priceEl);
+      }
       card.appendChild(ioEl);
       container.appendChild(card);
     }
