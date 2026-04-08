@@ -14,6 +14,8 @@ export const Events = {
   SET_STATUS:      'game:set-status',  // { msg, type?: 'info'|'success'|'warn'|'error', duration? }
   LIMIT_CHANGED:        'game:limit-changed',        // { count, limit }
   CRITICAL_PATH_CLICK:  'game:critical-path-click',  // { demandEl }
+  FIT_VIEW:    'game:fit-view',    // {}
+  SNAP_TOGGLE: 'game:snap-toggle', // {}
 };
 
 export class EventBus {

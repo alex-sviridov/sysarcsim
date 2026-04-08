@@ -15,6 +15,39 @@ A browser-based game where you play as a system architect. Build system architec
 | **Sidebar** | Catalog of available system elements |
 | **Controls** | Bottom panel with basic game controls |
 
+## Controls
+
+### Mouse
+
+| Action | Result |
+|--------|--------|
+| Click element | Select it |
+| Drag element | Move it |
+| Drag/click output port → input port | Draw a connection wire |
+| Click selected connection | Select the wire |
+| Click **×** on selected element or wire | Delete it |
+| Right-click element | Delete it |
+| Scroll wheel | Zoom in / out |
+| Drag empty canvas | Pan the view |
+
+### Keyboard
+
+| Key | Action |
+|-----|--------|
+| `Delete` / `Backspace` | Delete selected element or connection |
+| `Escape` | Cancel pending placement or wire in progress |
+| `G` | Toggle snap-to-grid |
+| `F` | Fit view — center all elements in the viewport |
+
+### Toolbar buttons
+
+| Button | Action |
+|--------|--------|
+| **Reset** | Clear all placed elements and start the level over |
+| **Zoom +/−** | Zoom in / out |
+| **Center** | Re-center the view on all elements |
+| **Snap** | Toggle snap-to-grid (same as `G`) |
+
 ## How to Play
 
 1. A **User Demand** element is preset on the desk — it defines what the user needs (e.g. a website).

@@ -93,9 +93,33 @@ export class InputHandler {
     this.canvas.addEventListener('wheel',       e => this.#onWheel(e), { passive: false });
 
     document.addEventListener('keydown', e => {
+      // Don't fire hotkeys when typing in an input field
+      if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return;
+
       if (e.key === 'Escape') {
         this.#bus.emit(Events.PENDING_CHANGED, { type: null, ghostElem: null });
         if (this.state?.mode === 'wire') this.state = null;
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.selectedEl && !this.selectedEl.def.preset) {
+          this.#bus.emit(Events.ELEMENT_DELETE, { el: this.selectedEl });
+          this.selectedEl = null;
+        } else if (this.#connMgr.selectedConn) {
+          this.#bus.emit(Events.CONN_DELETE, { conn: this.#connMgr.selectedConn });
+        }
+        return;
+      }
+
+      if (e.key === 'g' || e.key === 'G') {
+        this.#bus.emit(Events.SNAP_TOGGLE);
+        return;
+      }
+
+      if (e.key === 'f' || e.key === 'F') {
+        this.#bus.emit(Events.FIT_VIEW);
+        return;
       }
     });
   }

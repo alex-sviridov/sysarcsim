@@ -106,6 +106,16 @@ export class Game {
       this.input.snapToGrid = !this.input.snapToGrid;
       btnSnap.classList.toggle('active', this.input.snapToGrid);
     });
+
+    this.#bus.on(Events.FIT_VIEW, () => {
+      this.camera.centerOn(this.state.elements, this.#cssW, this.#cssH);
+      this.camera.clamp(this.state.elements, this.#cssW, this.#cssH);
+    });
+
+    this.#bus.on(Events.SNAP_TOGGLE, () => {
+      this.input.snapToGrid = !this.input.snapToGrid;
+      btnSnap.classList.toggle('active', this.input.snapToGrid);
+    });
   }
 
   // ── Event subscriptions ───────────────────────────────────────────────────
