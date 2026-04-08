@@ -9,6 +9,7 @@ export class Sidebar {
   #ghostElem    = null;
   #limitReached = false;
   #currentLevel = null;
+  #cardTemplate = document.getElementById('tmpl-component-card');
 
   constructor(bus) {
     this.#bus = bus;
@@ -35,24 +36,27 @@ export class Sidebar {
 
     for (const type of level.available) {
       const def  = this.#resolveDef(type);
-      const card = document.createElement('div');
-      card.className    = 'card';
+
+      const card    = this.#cardTemplate.content.cloneNode(true).firstElementChild;
       card.dataset.type = type;
 
-      // Icon
+      const iconEl  = card.querySelector('.card-icon');
+      const nameEl  = card.querySelector('.card-name');
+      const priceEl = card.querySelector('.card-price');
+      const ioEl    = card.querySelector('.card-io');
+
       if (def.icon) {
-        const iconEl = document.createElement('div');
-        iconEl.className = 'card-icon';
         iconEl.innerHTML = def.icon;
-        card.appendChild(iconEl);
+        iconEl.hidden = false;
       }
 
-      const nameEl = document.createElement('div');
-      nameEl.className   = 'card-name';
       nameEl.textContent = def.label;
 
-      const ioEl = document.createElement('div');
-      ioEl.className = 'card-io';
+      if (def.price != null) {
+        priceEl.textContent = `$${def.price}`;
+        priceEl.hidden = false;
+      }
+
       for (const k of outputKeys(def)) {
         const unit = PORT_UNIT[k] ? ` ${PORT_UNIT[k]}` : '';
         const span = document.createElement('span');
@@ -68,14 +72,6 @@ export class Sidebar {
         ioEl.appendChild(span);
       }
 
-      card.appendChild(nameEl);
-      if (def.price != null) {
-        const priceEl = document.createElement('div');
-        priceEl.className   = 'card-price';
-        priceEl.textContent = `$${def.price}`;
-        card.appendChild(priceEl);
-      }
-      card.appendChild(ioEl);
       container.appendChild(card);
     }
 

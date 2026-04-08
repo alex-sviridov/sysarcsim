@@ -85,6 +85,7 @@ function makeDocumentStub() {
     'btn-zoom-out':           makeNode('button'),
     'btn-center':             makeNode('button'),
     'btn-snap-grid':          makeNode('button'),
+    'tmpl-component-card':    makeCardTemplate(),
   };
   return {
     _nodes: nodes,
@@ -92,6 +93,25 @@ function makeDocumentStub() {
     createElement(tag) { return makeNode(tag); },
     querySelectorAll() { return []; },
     addEventListener() {},
+  };
+}
+
+function makeCardTemplate() {
+  function makeCardNode() {
+    const card = makeNode('div');
+    const parts = {
+      '.card-icon':  makeNode('div'),
+      '.card-name':  makeNode('div'),
+      '.card-price': makeNode('div'),
+      '.card-io':    makeNode('div'),
+    };
+    card.querySelector = sel => parts[sel] ?? null;
+    return card;
+  }
+  return {
+    content: {
+      cloneNode() { return { firstElementChild: makeCardNode() }; },
+    },
   };
 }
 

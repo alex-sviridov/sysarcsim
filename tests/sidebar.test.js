@@ -136,6 +136,34 @@ function matchesSel(node, sel) {
   return false;
 }
 
+// ── Template stub ─────────────────────────────────────────────────────────────
+
+function makeCardTemplate() {
+  function makeCardNode() {
+    const card = makeNode('div');
+    card.classList.add('card');
+    const partNames = ['card-icon', 'card-name', 'card-price', 'card-io'];
+    // card-icon and card-price start hidden (matching the HTML template)
+    const hiddenByDefault = new Set(['card-icon', 'card-price']);
+    const parts = {};
+    for (const name of partNames) {
+      const el = makeNode('div');
+      el.className = name;
+      el.classList.add(name);
+      el.hidden = hiddenByDefault.has(name);
+      card.appendChild(el);
+      parts[`.${name}`] = el;
+    }
+    card.querySelector = sel => parts[sel] ?? null;
+    return card;
+  }
+  return {
+    content: {
+      cloneNode() { return { firstElementChild: makeCardNode() }; },
+    },
+  };
+}
+
 // ── Document stub factory ─────────────────────────────────────────────────────
 
 function makeDocumentStub() {
@@ -160,6 +188,7 @@ function makeDocumentStub() {
     desk,
     'win-badge':                makeNode('div'),
     status:                     makeNode('div'),
+    'tmpl-component-card':      makeCardTemplate(),
   };
 
   return {
@@ -728,12 +757,14 @@ describe('Sidebar card price display', () => {
     expect(priceEl.textContent).toBe('$7');
   });
 
-  test('card for free element (no price field) has no .card-price child', () => {
+  test('card for free element (no price field) has .card-price hidden', () => {
     const { sidebar, nodes } = freshSetup();
     sidebar.build(LEVEL_FREE);
     const cards = nodes['sidebar-cards'].querySelectorAll('.card[data-type]');
     const priceEls = cards[0].querySelectorAll('.card-price');
-    expect(priceEls).toHaveLength(0);
+    // Template always creates the element; for free elements it stays hidden
+    expect(priceEls).toHaveLength(1);
+    expect(priceEls[0].hidden).toBe(true);
   });
 
   test('WebServer card (price defined in elements.json) has .card-price', () => {

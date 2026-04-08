@@ -14,6 +14,8 @@ export class Renderer {
   #portGlow    = new Map();
   // Critical-path highlight: { elemIds: Set, connIds: Set, startTime: number } | null
   #criticalHighlight = null;
+  // Reject animations: [{ from, to, startTime }]
+  #rejectAnims = [];
 
   constructor(canvas) {
     this.#ctx = canvas.getContext('2d');
@@ -21,6 +23,10 @@ export class Renderer {
 
   showCriticalPath(elemIds, connIds, demandId, now) {
     this.#criticalHighlight = { elemIds, connIds, demandId, startTime: now };
+  }
+
+  startRejectAnim(from, to, now) {
+    this.#rejectAnims.push({ from, to, startTime: now });
   }
 
   resize(w, h, dpr) {
@@ -47,6 +53,7 @@ export class Renderer {
     ctx.scale(cam.zoom, cam.zoom);
 
     this.#drawConnections(game.connMgr.connections, result, game.elemMap, now);
+    this.#drawRejectAnims(now);
     this.#drawWireInProgress(state);
     this.#drawElements(game.elements, game.connMgr.connections, result, now, hoveredLatencyEl);
     this.#drawSnapIndicator(state, now);
@@ -253,6 +260,30 @@ export class Renderer {
       wireColor = portColor + 'aa';
     }
     drawBezier(ctx, from.x, from.y, tx, ty, wireColor, 2, true);
+  }
+
+  #drawRejectAnims(now) {
+    const DURATION = 700;   // ms total
+    const BLINKS   = 3;     // full red flashes
+    const ctx      = this.#ctx;
+
+    this.#rejectAnims = this.#rejectAnims.filter(({ from, to, startTime }) => {
+      const age = now - startTime;
+      if (age >= DURATION) return false;
+
+      // progress 0→1, blink using sine so it starts and ends at 0
+      const t     = age / DURATION;
+      const alpha = Math.abs(Math.sin(t * Math.PI * BLINKS)) * (1 - t);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = '#ff4444';
+      ctx.shadowBlur  = 18;
+      drawBezier(ctx, from.x, from.y, to.x, to.y, '#ff4444', 3, false);
+      ctx.restore();
+
+      return true;
+    });
   }
 
   #drawElements(elements, connections, result, now, hoveredLatencyEl = null) {
