@@ -1,4 +1,4 @@
-import { ELEM_DEFS } from './config.js';
+import { ELEM_DEFS, PORT_R } from './config.js';
 import { LEVELS } from './levels.js';
 import { GameState } from './game-state.js';
 import { ConnectionManager } from './connection.js';
@@ -162,6 +162,16 @@ export class Game {
     });
 
     bus.on(Events.WIRE_COMPLETE, ({ fromElem, fromPort, x, y, snap }) => {
+      // Type-mismatch rejection animation
+      if (snap && !snap.snapValid) {
+        const fromCenter = fromElem.outputPos(fromPort);
+        const toCenter   = snap.snapElem.inputPos(snap.snapPort);
+        this.#renderer.startRejectAnim(
+          { x: fromCenter.x + PORT_R, y: fromCenter.y },
+          { x: toCenter.x  - PORT_R, y: toCenter.y   },
+          performance.now()
+        );
+      }
       const connsBefore = this.connMgr.connections.length;
       this.#completeWire(fromElem, fromPort, x, y, snap);
       if (this.connMgr.connections.length > connsBefore && !this.state.won) {
